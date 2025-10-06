@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any, Dict, Generic, Mapping, Optional, TypeVar
-
-from pydantic import BaseModel, ConfigDict, Field, field_serializer
+from typing import Dict, Generic, Optional, TypeVar
+from pydantic import ConfigDict, Field, field_serializer
 from pydantic.generics import GenericModel
 
 T = TypeVar("T")
+
 
 class HttpResponse(GenericModel, Generic[T]):
     model_config = ConfigDict(
         extra="ignore",
         populate_by_name=True,
         str_strip_whitespace=True,
+        ser_json_exclude_none=True,
     )
 
     message: Optional[str] = None
