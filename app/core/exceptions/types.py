@@ -18,3 +18,7 @@ class BadRequestError(DomainError):
 class DuplicateKeyDomainError(DomainError):
     def __init__(self, detail: str = "Já existe um registro com este valor único"):
         super().__init__(detail, status.HTTP_400_BAD_REQUEST)
+
+class ForbiddenError(DomainError):
+    def __init__(self, detail: str = "Acesso negado"):
+        super().__init__(detail, status.HTTP_403_FORBIDDEN)

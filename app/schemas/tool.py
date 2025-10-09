@@ -31,7 +31,7 @@ class ToolOutList(ToolBase):
     id: str
 
     @classmethod
-    def from_mongo(cls, doc: dict) -> "ToolOutList":
+    def from_raw(cls, doc: dict) -> "ToolOutList":
         if not doc:
             return None
         return cls(
@@ -45,7 +45,7 @@ class ToolOutDetail(ToolBase):
     escopo: Optional[Escopo] = None
 
     @classmethod
-    def from_mongo(cls, doc: dict) -> "ToolOutDetail":
+    def from_raw(cls, doc: dict) -> "ToolOutDetail":
         if not doc:
             return None
         return cls(

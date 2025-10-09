@@ -31,7 +31,7 @@ class ModeloAiOutList(ModeloAiBase):
     id: str
 
     @classmethod
-    def from_mongo(cls, doc: dict) -> "ModeloAiOutList":
+    def from_raw(cls, doc: dict) -> "ModeloAiOutList":
         if not doc:
             return None
         return cls(
@@ -45,7 +45,7 @@ class ModeloAiOutDetail(ModeloAiBase):
     escopo: Optional[Escopo] = None
 
     @classmethod
-    def from_mongo(cls, doc: dict) -> "ModeloAiOutDetail":
+    def from_raw(cls, doc: dict) -> "ModeloAiOutDetail":
         if not doc:
             return None
         return cls(

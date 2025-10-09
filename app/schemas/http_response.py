@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 from typing import Dict, Generic, Optional, TypeVar
 from pydantic import ConfigDict, Field, field_serializer
 from pydantic.generics import GenericModel
+from bson import ObjectId
 
 T = TypeVar("T")
 
@@ -14,6 +15,7 @@ class HttpResponse(GenericModel, Generic[T]):
         populate_by_name=True,
         str_strip_whitespace=True,
         ser_json_exclude_none=True,
+        json_encoders={ObjectId: str},
     )
 
     message: Optional[str] = None

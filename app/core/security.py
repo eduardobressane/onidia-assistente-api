@@ -1,5 +1,6 @@
 import os, base64, time
 from dotenv import load_dotenv
+from uuid import UUID
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List, Set
 from jose import jwt
@@ -9,6 +10,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.cache import cache_get_json, cache_set_json, cache_ping
 
 from app.dataprovider.postgre.session import SessionLocal
+from app.dataprovider.postgre.repository.contratante import contratante_exists
 from sqlalchemy import text
 
 # Carrega variáveis de ambiente do .env
@@ -210,3 +212,26 @@ def get_usuario_e_perfis(uid: str) -> Dict[str, Any]:
         "uuid_contratante": uuid_contratante,
         "perfis": perfis
     }
+
+def validate_contratante_access(current_user: dict, id_contratante: UUID | None):
+    """
+    Valida se o usuário logado pode consultar os dados de um contratante específico.
+    - Se id_contratante for None, não faz nada.
+    - Se o usuário tem '*' em rules, valida apenas se o contratante existe.
+    - Caso contrário, lança 403 (sem permissão).
+    """
+    if id_contratante is None:
+        return True # nada a validar
+
+    if "*" in current_user.get("rules", []):
+        with SessionLocal() as db:
+            if not contratante_exists(db, id_contratante):
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Contratante não encontrado"
+                )
+    else:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso negado"
+        )

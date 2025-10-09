@@ -1,7 +1,6 @@
 from typing import List
 from bson import ObjectId
 from fastapi import HTTPException
-import json
 
 from app.dataprovider.mongo.models.modelo_ai import collection as modelo_ai_coll
 from app.schemas.modelo_ai import (
@@ -9,64 +8,45 @@ from app.schemas.modelo_ai import (
     ModeloAiOutList, ModeloAiOutDetail
 )
 from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError
-from app.core.cache import (
-    cache_get_json, cache_set_json,
-    cache_delete
-)
 from app.core.utils.mongo import ensure_object_id
+from app.core.cache_decorators import cacheable, cache_evict
 from pymongo.errors import DuplicateKeyError
+
 
 class ModeloAiService:
 
     @staticmethod
+    @cacheable("modelos_ai:all", ttl_seconds=0)
     async def listar() -> List[ModeloAiOutList]:
-        cache_key = "modelos_ai:all"
-
-        cached = cache_get_json(cache_key)
-        if cached:
-            data = json.loads(cached)
-            return [ModeloAiOutList(**item) for item in data]
-
         items: list[ModeloAiOutList] = []
         async for doc in modelo_ai_coll.find():
-            items.append(ModeloAiOutList.from_mongo(doc))
-
-        cache_set_json(cache_key, json.dumps([i.model_dump() for i in items]))
+            items.append(ModeloAiOutList.from_raw(doc))
         return items
 
     @staticmethod
+    @cacheable("modelos_ai", key_params=["id"], ttl_seconds=0)
     async def obter(id: str) -> ModeloAiOutDetail:
-        cache_key = f"modelos_ai:{id}"
-
-        cached = cache_get_json(cache_key, ModeloAiOutDetail)
-        if cached:
-            return cached
-
         oid = ensure_object_id(id)
         doc = await modelo_ai_coll.find_one({"_id": oid})
 
         if not doc:
             raise NotFoundError("Modelo não encontrado")
 
-        modelo = ModeloAiOutDetail.from_mongo(doc)
-        cache_set_json(cache_key, modelo.model_dump())
-        return modelo
+        return ModeloAiOutDetail.from_raw(doc)
 
     @staticmethod
+    @cache_evict(["modelos_ai:all"])
     async def criar(payload: ModeloAiCreate) -> ModeloAiOutDetail:
         try:
             to_insert = payload.model_dump()
             result = await modelo_ai_coll.insert_one(to_insert)
             created = await modelo_ai_coll.find_one({"_id": result.inserted_id})
-
-            modelo = ModeloAiOutDetail.from_mongo(created)
-
-            cache_delete("modelos_ai:all")
-            return modelo
+            return ModeloAiOutDetail.from_raw(created)
         except DuplicateKeyError:
             raise DuplicateKeyDomainError("Já existe um modelo com este nome")
 
     @staticmethod
+    @cache_evict(["modelos_ai:all", "modelos_ai:id={id}"], key_params=["id"])
     async def atualizar(id: str, payload: ModeloAiUpdate) -> ModeloAiOutDetail:
         oid = ensure_object_id(id)
         data = payload.model_dump(exclude_none=True)
@@ -80,13 +60,10 @@ class ModeloAiService:
         if not updated:
             raise NotFoundError("Modelo não encontrado")
 
-        modelo = ModeloAiOutDetail.from_mongo(updated)
-
-        cache_delete("modelos_ai:all")
-        cache_delete(f"modelos_ai:{id}")
-        return modelo
+        return ModeloAiOutDetail.from_raw(updated)
 
     @staticmethod
+    @cache_evict(["modelos_ai:all", "modelos_ai:id={id}"], key_params=["id"])
     async def remover(id: str) -> bool:
         oid = ensure_object_id(id)
         result = await modelo_ai_coll.delete_one({"_id": oid})
@@ -94,6 +71,4 @@ class ModeloAiService:
         if result.deleted_count == 0:
             raise NotFoundError("Modelo não encontrado")
 
-        cache_delete("modelos_ai:all")
-        cache_delete(f"modelos_ai:{id}")
         return True
