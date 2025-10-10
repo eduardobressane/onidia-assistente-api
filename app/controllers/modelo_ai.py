@@ -12,7 +12,7 @@ from app.core.security import require_permissions
 from app.schemas.http_response import HttpResponse
 from app.schemas.http_response_advice import ok, created, updated, deleted
 
-router = APIRouter(prefix="/modelo_ai", tags=["ModeloAI"])
+router = APIRouter(prefix="/modelos_ai", tags=["Modelos de AI"])
 
 
 @router.get("", response_model=HttpResponse[List[ModeloAiOutList]], dependencies=[Depends(require_permissions(["*", "hafinjvq6t"]))])

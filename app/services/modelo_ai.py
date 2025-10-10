@@ -3,11 +3,12 @@ from bson import ObjectId
 from fastapi import HTTPException
 
 from app.dataprovider.mongo.models.modelo_ai import collection as modelo_ai_coll
+from app.dataprovider.mongo.models.credencial_modelo_ai import collection as credencial_modelo_ai_coll
 from app.schemas.modelo_ai import (
     ModeloAiCreate, ModeloAiUpdate,
     ModeloAiOutList, ModeloAiOutDetail
 )
-from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError
+from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError, BusinessDomainError
 from app.core.utils.mongo import ensure_object_id
 from app.core.cache_decorators import cacheable, cache_evict
 from pymongo.errors import DuplicateKeyError
@@ -65,6 +66,11 @@ class ModeloAiService:
     @staticmethod
     @cache_evict(["modelos_ai:all", "modelos_ai:id={id}"], key_params=["id"])
     async def remover(id: str) -> bool:
+        # Verifica se existem credenciais vinculadas
+        credencial_existente = await credencial_modelo_ai_coll.find_one({"id_tool": id})
+        if credencial_existente:
+            raise BusinessDomainError("Existem credenciais cadastradas para este modelo. Exclua-as primeiro.")
+
         oid = ensure_object_id(id)
         result = await modelo_ai_coll.delete_one({"_id": oid})
 

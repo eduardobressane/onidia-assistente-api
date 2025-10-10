@@ -22,3 +22,7 @@ class DuplicateKeyDomainError(DomainError):
 class ForbiddenError(DomainError):
     def __init__(self, detail: str = "Acesso negado"):
         super().__init__(detail, status.HTTP_403_FORBIDDEN)
+
+class BusinessDomainError(DomainError):
+    def __init__(self, detail: str):
+        super().__init__(detail, status.HTTP_400_BAD_REQUEST)

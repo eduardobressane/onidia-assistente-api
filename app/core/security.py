@@ -216,12 +216,12 @@ def get_usuario_e_perfis(uid: str) -> Dict[str, Any]:
 def validate_contratante_access(current_user: dict, id_contratante: UUID | None):
     """
     Valida se o usuário logado pode consultar os dados de um contratante específico.
-    - Se id_contratante for None, não faz nada.
+    - Se id_contratante for None ou id_contratante igual ao do current_user, não faz nada.
     - Se o usuário tem '*' em rules, valida apenas se o contratante existe.
     - Caso contrário, lança 403 (sem permissão).
     """
-    if id_contratante is None:
-        return True # nada a validar
+    if not id_contratante or id_contratante == current_user.get("cid"):
+        return True
 
     if "*" in current_user.get("rules", []):
         with SessionLocal() as db:

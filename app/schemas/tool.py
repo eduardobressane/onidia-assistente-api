@@ -16,15 +16,13 @@ class Escopo(BaseModel):
 # Base comum
 class ToolBase(BaseModel):
     nome: str = Field(..., max_length=150)
-    ativo: bool = True
+    ativo: bool = Field(default=True)
 
 # Create e Update
 class ToolCreate(ToolBase):
     escopo: Optional[Escopo] = None
 
-class ToolUpdate(BaseModel):
-    nome: Optional[str] = Field(None, max_length=150)
-    ativo: Optional[bool] = None
+class ToolUpdate(ToolBase):
     escopo: Optional[Escopo] = None
 
 class ToolOutList(ToolBase):

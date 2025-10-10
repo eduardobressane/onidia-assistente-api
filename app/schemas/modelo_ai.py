@@ -16,15 +16,13 @@ class Escopo(BaseModel):
 # Base comum
 class ModeloAiBase(BaseModel):
     nome: str = Field(..., max_length=150)
-    ativo: bool = True
+    ativo: bool = Field(default=True)
 
 # Create e Update
 class ModeloAiCreate(ModeloAiBase):
     escopo: Optional[Escopo] = None
 
-class ModeloAiUpdate(BaseModel):
-    nome: Optional[str] = Field(None, max_length=150)
-    ativo: Optional[bool] = None
+class ModeloAiUpdate(ModeloAiBase):
     escopo: Optional[Escopo] = None
 
 class ModeloAiOutList(ModeloAiBase):

@@ -4,10 +4,11 @@ from fastapi import HTTPException
 import json
 
 from app.dataprovider.mongo.models.tool import collection as tool_coll
+from app.dataprovider.mongo.models.credencial_tool import collection as credencial_tool_coll
 from app.schemas.tool import (
     ToolCreate, ToolUpdate, ToolOutList, ToolOutDetail
 )
-from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError
+from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError, BusinessDomainError
 from app.core.utils.mongo import ensure_object_id
 from app.core.cache_decorators import cacheable, cache_evict
 from pymongo.errors import DuplicateKeyError
@@ -65,6 +66,11 @@ class ToolService:
     @staticmethod
     @cache_evict(["tools:all", "tools:id={id}"], key_params=["id"])
     async def remover(id: str) -> bool:
+        # Verifica se existem credenciais vinculadas
+        credencial_existente = await credencial_tool_coll.find_one({"id_tool": id})
+        if credencial_existente:
+            raise BusinessDomainError("Existem credenciais cadastradas para esta tool. Exclua-as primeiro.")
+
         oid = ensure_object_id(id)
         result = await tool_coll.delete_one({"_id": oid})
 
