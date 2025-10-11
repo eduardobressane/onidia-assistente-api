@@ -18,17 +18,17 @@ class AgenteService:
 
     @staticmethod
     #@cacheable("agentes:all", ttl_seconds=0)
-    async def listar() -> List[AgenteOutList]:
+    def listar() -> List[AgenteOutList]:
         items: list[AgenteOutList] = []
-        async for doc in agente_coll.find():
+        for doc in agente_coll.find():
             items.append(AgenteOutList.from_raw(doc))
         return items
 
     @staticmethod
     #@cacheable("tools", key_params=["id"], ttl_seconds=0)
-    async def obter(id: str) -> AgenteOutDetail:
-        doc = await get_agente_detail(id)
-        print(doc)
+    def obter(id: str) -> AgenteOutDetail:
+        doc = get_agente_detail(id)
+
         if not doc:
             raise NotFoundError("Agente não encontrado")
 
@@ -36,23 +36,29 @@ class AgenteService:
 
     @staticmethod
     #@cache_evict(["tools:all"])
-    async def criar(payload: AgenteCreate) -> AgenteOutDetail:
-        to_insert = payload.model_dump()
-        result = await agente_coll.insert_one(to_insert)
-        created = await agente_coll.find_one({"_id": result.inserted_id})
-        return AgenteOutDetail.from_raw(created)
+    def criar(payload: AgenteCreate) -> AgenteOutDetail:
+        try:
+            to_insert = payload.model_dump()
+            result = agente_coll.insert_one(to_insert)
+            created = agente_coll.find_one({"_id": result.inserted_id})
+            return AgenteOutDetail.from_raw(created)
+        except DuplicateKeyError:
+            raise DuplicateKeyDomainError("Já existe um agente com este nome")
 
     @staticmethod
     #@cache_evict(["tools:all", "tools:id={id}"], key_params=["id"])
-    async def atualizar(id: str, payload: AgenteUpdate) -> AgenteOutDetail:
+    def atualizar(id: str, payload: AgenteUpdate) -> AgenteOutDetail:
         oid = ensure_object_id(id)
         data = payload.model_dump(exclude_none=True)
 
-        updated = await tool_cagente_colloll.find_one_and_update(
-            {"_id": oid},
-            {"$set": data},
-            return_document=True
-        )
+        try:
+            updated = tool_cagente_colloll.find_one_and_update(
+                {"_id": oid},
+                {"$set": data},
+                return_document=True
+            )
+        except DuplicateKeyError:
+            raise DuplicateKeyDomainError("Já existe um agente com este nome")
 
         if not updated:
             raise NotFoundError("Agente não encontrado")
@@ -61,9 +67,9 @@ class AgenteService:
 
     @staticmethod
     #@cache_evict(["tools:all", "tools:id={id}"], key_params=["id"])
-    async def remover(id: str) -> bool:
+    def remover(id: str) -> bool:
         oid = ensure_object_id(id)
-        result = await agente_coll.delete_one({"_id": oid})
+        result = agente_coll.delete_one({"_id": oid})
 
         if result.deleted_count == 0:
             raise NotFoundError("Agente não encontrado")

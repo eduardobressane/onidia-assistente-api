@@ -1,6 +1,6 @@
 from typing import List, Optional
 from pydantic import BaseModel, Field, model_validator, field_validator
-from app.core.exceptions.types import NotFoundError
+from app.core.exceptions.types import NotFoundError, BadRequestError
 from bson import ObjectId
 
 class Funcao(BaseModel):
@@ -21,7 +21,7 @@ class ToolInfoCreateOrUpdate(BaseModel):
     @classmethod
     def validate_object_id(cls, v: str) -> str:
         if not ObjectId.is_valid(v):
-            raise NotFoundError(f"Tool com id {tool.id} não existe")
+            raise NotFoundError(f"Tool com id {v} não existe")
         return v
 
 
@@ -29,17 +29,10 @@ class ToolCreateOrUpdate(BaseModel):
     tool: ToolInfoCreateOrUpdate
     nome: str = Field(..., max_length=150)
 
-    def to_mongo(self) -> dict:
-        return {
-            "tool_id": self.tool.id,
-            "nome": self.nome,
-        }
-
 
 class Tool(BaseModel):
     tool: ToolInfo
     nome: str
-    escopo: Optional[str] = None
 
 
 class AgenteBase(BaseModel):
@@ -56,7 +49,7 @@ class AgenteBase(BaseModel):
         funcoes = self.funcoes or []
         codigos = [f.codigo for f in funcoes]
         if len(codigos) != len(set(codigos)):
-            raise ValueError("Os códigos das funções devem ser únicos dentro do agente.")
+            raise BadRequestError("Os códigos das funções devem ser únicos dentro do agente.") 
         return self
 
 
@@ -67,7 +60,7 @@ class AgenteCreate(AgenteBase):
     def validate_tools_unique(self):
         nomes = [t.nome for t in self.tools or []]
         if len(nomes) != len(set(nomes)):
-            raise ValueError("Os nomes das tools devem ser únicos dentro do agente.")
+            raise BadRequestError("Os nomes das tools devem ser únicos dentro do agente.")
         return self
 
 
@@ -78,7 +71,7 @@ class AgenteUpdate(AgenteBase):
     def validate_tools_unique(self):
         nomes = [t.nome for t in self.tools or []]
         if len(nomes) != len(set(nomes)):
-            raise ValueError("Os nomes das tools devem ser únicos dentro do agente.")
+            raise BadRequestError("Os nomes das tools devem ser únicos dentro do agente.")
         return self
 
 

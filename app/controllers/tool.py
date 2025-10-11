@@ -13,30 +13,30 @@ router = APIRouter(prefix="/tools", tags=["Tools"])
 
 
 @router.get("", response_model=HttpResponse[List[ToolOutList]], dependencies=[Depends(require_permissions(["*", "hafir5fmxh"]))])
-async def listar():
-    tools: List[ToolOutList] = await ToolService.listar()
+def listar():
+    tools: List[ToolOutList] = ToolService.listar()
     return ok(total=len(tools), data=tools)
 
 
 @router.get("/{id}", response_model=ToolOutDetail, dependencies=[Depends(require_permissions(["*", "hafirf720i"]))])
-async def obter(id: str):
-    tool: ToolOutDetail = await ToolService.obter(id)
+def obter(id: str):
+    tool: ToolOutDetail = ToolService.obter(id)
     return tool
 
 
 @router.post("", response_model=HttpResponse[ToolOutDetail], dependencies=[Depends(require_permissions(["*", "hafirojaiq"]))])
-async def criar(payload: ToolCreate):
-    novo: ToolOutDetail = await ToolService.criar(payload)
+def criar(payload: ToolCreate):
+    novo: ToolOutDetail = ToolService.criar(payload)
     return created(data=novo)
 
 
 @router.put("/{id}", response_model=HttpResponse[ToolOutDetail], dependencies=[Depends(require_permissions(["*", "hafis7dqeb"]))])
-async def atualizar(id: str, payload: ToolUpdate):
-    atualizado: ToolOutDetail = await ToolService.atualizar(id, payload)
+def atualizar(id: str, payload: ToolUpdate):
+    atualizado: ToolOutDetail = ToolService.atualizar(id, payload)
     return updated(data=atualizado)
 
 
 @router.delete("/{id}", response_model=HttpResponse[None], dependencies=[Depends(require_permissions(["*", "hafisjuecf"]))])
-async def remover(id: str):
-    await ToolService.remover(id)
+def remover(id: str):
+    ToolService.remover(id)
     return deleted()

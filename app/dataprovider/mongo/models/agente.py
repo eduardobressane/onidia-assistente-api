@@ -1,10 +1,18 @@
 from app.dataprovider.mongo.base import db
 from bson import ObjectId
+from pymongo import ASCENDING
 
 COLLECTION_NAME = "agente"
 collection = db[COLLECTION_NAME]
 
-async def get_agente_detail(id: str):
+# índice composto e único em nome + id_contratante
+collection.create_index(
+    [("nome", ASCENDING), ("id_contratante", ASCENDING)],
+    unique=True,
+    name="uniq_nome_id_contratante"
+)
+
+def get_agente_detail(id: str):
     pipeline = [
         {"$match": {"_id": ObjectId(id)}},
         {"$unwind": {"path": "$tools", "preserveNullAndEmptyArrays": True}},
@@ -36,6 +44,6 @@ async def get_agente_detail(id: str):
 
     cursor = collection.aggregate(pipeline)
 
-    docs = await cursor.to_list(length=1)  # pega só o primeiro
+    docs = cursor.to_list(length=1)  # pega só o primeiro
     return docs[0] if docs else None
 

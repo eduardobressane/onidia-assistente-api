@@ -16,30 +16,30 @@ router = APIRouter(prefix="/modelos_ai", tags=["Modelos de AI"])
 
 
 @router.get("", response_model=HttpResponse[List[ModeloAiOutList]], dependencies=[Depends(require_permissions(["*", "hafinjvq6t"]))])
-async def listar():
-    modelos: List[ModeloAiOutList] = await ModeloAiService.listar()
+def listar():
+    modelos: List[ModeloAiOutList] = ModeloAiService.listar()
     return ok(total=len(modelos), data=modelos)
 
 
 @router.get("/{id}", response_model=ModeloAiOutDetail, dependencies=[Depends(require_permissions(["*", "hafinyo101"]))])
-async def obter(id: str):
-    modelo: ModeloAiOutDetail = await ModeloAiService.obter(id)
+def obter(id: str):
+    modelo: ModeloAiOutDetail = ModeloAiService.obter(id)
     return modelo
 
 
 @router.post("", response_model=HttpResponse[ModeloAiOutDetail], dependencies=[Depends(require_permissions(["*", "hafioitpkt"]))])
-async def criar(payload: ModeloAiCreate):
-    novo: ModeloAiOutDetail = await ModeloAiService.criar(payload)
+def criar(payload: ModeloAiCreate):
+    novo: ModeloAiOutDetail = ModeloAiService.criar(payload)
     return created(data=novo)
 
 
 @router.put("/{id}", response_model=HttpResponse[ModeloAiOutDetail], dependencies=[Depends(require_permissions(["*", "hafip1bfnc"]))])
-async def atualizar(id: str, payload: ModeloAiUpdate):
-    atualizado: ModeloAiOutDetail = await ModeloAiService.atualizar(id, payload)
+def atualizar(id: str, payload: ModeloAiUpdate):
+    atualizado: ModeloAiOutDetail = ModeloAiService.atualizar(id, payload)
     return updated(data=atualizado)
 
 
 @router.delete("/{id}", response_model=HttpResponse[None], dependencies=[Depends(require_permissions(["*", "hafipau25p"]))])
-async def remover(id: str):
-    await ModeloAiService.remover(id)
+def remover(id: str):
+    ModeloAiService.remover(id)
     return deleted()

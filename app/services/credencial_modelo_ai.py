@@ -15,10 +15,10 @@ from app.core.utils.mongo import ensure_object_id
 class CredencialModeloAiService:
 
     @staticmethod
-    async def listar(id_modelo_ai: str, id_contratante: UUID) -> List[CredencialModeloAiOutList]:
+    def listar(id_modelo_ai: str, id_contratante: UUID) -> List[CredencialModeloAiOutList]:
         items: list[CredencialModeloAiOutList] = []
 
-        async for doc in credencial_modelo_ai_coll.find({
+        for doc in credencial_modelo_ai_coll.find({
             "id_modelo_ai": id_modelo_ai,
             "id_contratante": str(id_contratante)
         }):
@@ -27,9 +27,9 @@ class CredencialModeloAiService:
         return items
 
     @staticmethod
-    async def obter(id: str) -> CredencialModeloAiInterna:
+    def obter(id: str) -> CredencialModeloAiInterna:
         oid = ensure_object_id(id)
-        doc = await credencial_modelo_ai_coll.find_one({"_id": oid})
+        doc = credencial_modelo_ai_coll.find_one({"_id": oid})
 
         if not doc:
             raise NotFoundError("Credencial não encontrada")
@@ -37,46 +37,49 @@ class CredencialModeloAiService:
         return CredencialModeloAiInterna.from_raw(doc)
 
     @staticmethod
-    async def criar(id_modelo_ai: str, id_contratante: UUID, payload: CredencialModeloAiCreate) -> CredencialModeloAiOutDetail:
+    def criar(id_modelo_ai: str, id_contratante: UUID, payload: CredencialModeloAiCreate) -> CredencialModeloAiOutDetail:
         try:
             to_insert = payload.model_dump()
             to_insert["id_modelo_ai"] = id_modelo_ai
             to_insert["id_contratante"] = str(id_contratante)
 
-            result = await credencial_modelo_ai_coll.insert_one(to_insert)
-            created = await credencial_modelo_ai_coll.find_one({"_id": result.inserted_id})
+            result = credencial_modelo_ai_coll.insert_one(to_insert)
+            created = credencial_modelo_ai_coll.find_one({"_id": result.inserted_id})
 
             return CredencialModeloAiOutDetail.from_raw(created)
         except DuplicateKeyError:
             raise DuplicateKeyDomainError("Já existe uma credencial com esta descrição")
 
     @staticmethod
-    async def atualizar(id: str, payload: CredencialModeloAiUpdate) -> CredencialModeloAiOutDetail:
+    def atualizar(id: str, payload: CredencialModeloAiUpdate) -> CredencialModeloAiOutDetail:
         oid = ensure_object_id(id)
-        doc = await credencial_modelo_ai_coll.find_one({"_id": oid})
+        doc = credencial_modelo_ai_coll.find_one({"_id": oid})
 
         if (not doc):
             raise NotFoundError("Credencial não encontrada")
 
         data = payload.model_dump(exclude_none=True)
 
-        updated = await credencial_modelo_ai_coll.find_one_and_update(
-            {"_id": oid},
-            {"$set": data},
-            return_document=ReturnDocument.AFTER
-        )
+        try:
+            updated = credencial_modelo_ai_coll.find_one_and_update(
+                {"_id": oid},
+                {"$set": data},
+                return_document=ReturnDocument.AFTER
+            )
+        except DuplicateKeyError:
+            raise DuplicateKeyDomainError("Já existe uma credencial com esta descrição")
 
         return CredencialModeloAiOutDetail.from_raw(updated)
 
     @staticmethod
-    async def remover(id: str) -> bool:
+    def remover(id: str) -> bool:
         oid = ensure_object_id(id)
-        doc = await credencial_modelo_ai_coll.find_one({"_id": oid})
+        doc = credencial_modelo_ai_coll.find_one({"_id": oid})
 
         if (not doc):
             raise NotFoundError("Credencial não encontrada")
 
-        result = await credencial_modelo_ai_coll.delete_one({"_id": oid})
+        result = credencial_modelo_ai_coll.delete_one({"_id": oid})
 
         if result.deleted_count == 0:
             raise NotFoundError("Credencial não encontrada")
