@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List, Optional, Any
 from pydantic import BaseModel, Field, model_validator, field_validator
 from app.core.exceptions.types import NotFoundError, BadRequestError
 from bson import ObjectId
@@ -12,6 +12,7 @@ class Funcao(BaseModel):
 class ToolInfo(BaseModel):
     id: str
     nome: str
+    escopo: dict[str, Any] = None
 
 
 class ToolInfoCreateOrUpdate(BaseModel):
@@ -41,7 +42,6 @@ class AgenteBase(BaseModel):
     visivel: bool = Field(default=True)
     publico: bool = Field(default=True)
     ativo: bool = Field(default=True)
-    id_contratante: Optional[str] = None
     funcoes: Optional[List[Funcao]] = None
 
     @model_validator(mode="after")
@@ -110,9 +110,8 @@ class AgenteOutDetail(AgenteBase):
             if "tool_id" in t:
                 tools.append(
                     Tool(
-                        tool=ToolInfo(id=str(t["tool_id"]), nome=""),  # nome vazio (ou buscar depois)
-                        nome=t.get("nome"),
-                        escopo=t.get("escopo")
+                        tool=ToolInfo(id=str(t["tool_id"]), nome="", escopo=None),  # nome vazio (ou buscar depois)
+                        nome=t.get("nome")
                     )
                 )
             # Se vier "tool" já expandido
@@ -122,10 +121,10 @@ class AgenteOutDetail(AgenteBase):
                     Tool(
                         tool=ToolInfo(
                             id=str(tool_data.get("id")),
-                            nome=tool_data.get("nome", "")
+                            nome=tool_data.get("nome"),
+                            escopo=tool_data.get("escopo")
                         ),
-                        nome=t.get("nome"),
-                        escopo=t.get("escopo")
+                        nome=t.get("nome")
                     )
                 )
 

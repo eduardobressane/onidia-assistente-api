@@ -26,7 +26,8 @@ def get_agente_detail(id: str):
         {"$addFields": {
             "tools.tool": {
                 "id": "$tool_info._id",
-                "nome": "$tool_info.nome"
+                "nome": "$tool_info.nome",
+                "escopo": "$tool_info.escopo"
             }
         }},
         {"$group": {
