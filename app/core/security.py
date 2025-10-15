@@ -10,7 +10,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.core.cache import cache_get_json, cache_set_json, cache_ping
 
 from app.dataprovider.postgre.session import SessionLocal
-from app.dataprovider.postgre.repository.contratante import contratante_exists
+from app.dataprovider.postgre.repository.contractor import contractor_exists
 from sqlalchemy import text
 
 # Carrega variáveis de ambiente do .env
@@ -213,19 +213,19 @@ def get_usuario_e_perfis(uid: str) -> Dict[str, Any]:
         "perfis": perfis
     }
 
-def validate_contratante_access(current_user: dict, id_contratante: UUID | None):
+def validate_contractor_access(current_user: dict, contractor_id: UUID | None):
     """
     Valida se o usuário logado pode consultar os dados de um contratante específico.
-    - Se id_contratante for None ou id_contratante igual ao do current_user, não faz nada.
+    - Se contractor_id for None ou contractor_id igual ao cid do current_user, não faz nada.
     - Se o usuário tem '*' em rules, valida apenas se o contratante existe.
     - Caso contrário, lança 403 (sem permissão).
     """
-    if not id_contratante or id_contratante == current_user.get("cid"):
+    if not contractor_id or contractor_id == current_user.get("cid"):
         return True
 
     if "*" in current_user.get("rules", []):
         with SessionLocal() as db:
-            if not contratante_exists(db, id_contratante):
+            if not contratator_exists(db, contractor_id):
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail="Contratante não encontrado"

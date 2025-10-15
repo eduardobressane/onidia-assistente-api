@@ -4,7 +4,7 @@ from app.core.exceptions.types import NotFoundError
 COLLECTION_NAME = "tool"
 collection = db[COLLECTION_NAME]
 
-collection.create_index("nome", unique=True)
+collection.create_index("name", unique=True)
 
 def validar_tools_existentes(tools: list[dict]):
     for t in tools:

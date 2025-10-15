@@ -12,21 +12,22 @@ class ScopeField(BaseModel):
 class Scope(BaseModel):
     fields: List[ScopeField]
 
-class ToolBase(BaseModel):
+class AiModelBase(BaseModel):
     name: str = Field(..., max_length=150)
     enabled: bool = Field(default=True)
 
-class ToolCreate(ToolBase):
+# Create e Update
+class AiModelCreate(AiModelBase):
     scope: Optional[Scope] = None
 
-class ToolUpdate(ToolBase):
+class AiModelUpdate(AiModelBase):
     scope: Optional[Scope] = None
 
-class ToolOutList(ToolBase):
+class AiModelOutList(AiModelBase):
     id: str
 
     @classmethod
-    def from_raw(cls, doc: dict) -> "ToolOutList":
+    def from_raw(cls, doc: dict) -> "AiModelOutList":
         if not doc:
             return None
         return cls(
@@ -35,12 +36,12 @@ class ToolOutList(ToolBase):
             enabled=doc.get("enabled", True)
         )
 
-class ToolOutDetail(ToolBase):
+class AiModelOutDetail(AiModelBase):
     id: str
     scope: Optional[Scope] = None
 
     @classmethod
-    def from_raw(cls, doc: dict) -> "ToolOutDetail":
+    def from_raw(cls, doc: dict) -> "AiModelOutDetail":
         if not doc:
             return None
         return cls(

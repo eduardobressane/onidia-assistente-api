@@ -13,16 +13,16 @@ from app.core.exceptions.handlers import (
 )
 
 from app.controllers import auth
-from app.controllers import assistente as assistente_ctrl
-from app.controllers import agente as agente_ctrl
-from app.controllers import modelo_ai as modelo_ai_ctrl
-from app.controllers import credencial_modelo_ai as credencial_modelo_ai_ctrl
+from app.controllers import assistant as assistant_ctrl
+from app.controllers import agent as agent_ctrl
+from app.controllers import ai_model as ai_model_ctrl
+from app.controllers import ai_model_credentials as ai_model_credentials_ctrl
 from app.controllers import tool as tool_ctrl
-from app.controllers import credencial_tool as credencial_tool_ctrl
+from app.controllers import tool_credentials as tool_credentials_ctrl
 
 from app.core.translations import TRANSLATIONS
 
-# --- Carregar variáveis ---
+# --- Load variables ---
 load_dotenv()
 app_name = os.getenv("APP_NAME")
 
@@ -34,11 +34,11 @@ app.add_exception_handler(RequestValidationError, validation_exception_handler)
 app.add_exception_handler(HTTPException, http_exception_handler)
 app.add_exception_handler(Exception, unhandled_exception_handler)
 
-# --- Rotas ---
+# --- Routers ---
 app.include_router(auth.router)
-app.include_router(assistente_ctrl.router)
-app.include_router(agente_ctrl.router)
-app.include_router(modelo_ai_ctrl.router)
-app.include_router(credencial_tool_ctrl.router)
+app.include_router(assistant_ctrl.router)
+app.include_router(agent_ctrl.router)
+app.include_router(ai_model_ctrl.router)
+app.include_router(ai_model_credentials_ctrl.router)
 app.include_router(tool_ctrl.router)
-app.include_router(credencial_modelo_ai_ctrl.router)
+app.include_router(tool_credentials_ctrl.router)

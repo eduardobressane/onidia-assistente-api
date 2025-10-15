@@ -4,8 +4,8 @@ from fastapi import HTTPException
 import json
 
 from app.dataprovider.mongo.models.tool import collection as tool_coll
-from app.dataprovider.mongo.models.credencial_tool import collection as credencial_tool_coll
-from app.dataprovider.mongo.models.agente import collection as agente_coll
+from app.dataprovider.mongo.models.tool_credentials import collection as tool_credentials_coll
+from app.dataprovider.mongo.models.agent import collection as agent_coll
 from app.schemas.tool import (
     ToolCreate, ToolUpdate, ToolOutList, ToolOutDetail
 )
@@ -19,7 +19,7 @@ class ToolService:
 
     @staticmethod
     @cacheable("tools:all", ttl_seconds=0)
-    def listar() -> List[ToolOutList]:
+    def get_all() -> List[ToolOutList]:
         items: list[ToolOutList] = []
         for doc in tool_coll.find():
             items.append(ToolOutList.from_raw(doc))
@@ -27,7 +27,7 @@ class ToolService:
 
     @staticmethod
     @cacheable("tools", key_params=["id"], ttl_seconds=0)
-    def obter(id: str) -> ToolOutDetail:
+    def get_by_id(id: str) -> ToolOutDetail:
         oid = ensure_object_id(id)
         doc = tool_coll.find_one({"_id": oid})
 
@@ -38,7 +38,7 @@ class ToolService:
 
     @staticmethod
     @cache_evict(["tools:all"])
-    def criar(payload: ToolCreate) -> ToolOutDetail:
+    def create(payload: ToolCreate) -> ToolOutDetail:
         try:
             to_insert = payload.model_dump()
             result = tool_coll.insert_one(to_insert)
@@ -49,7 +49,7 @@ class ToolService:
 
     @staticmethod
     @cache_evict(["tools:all", "tools:id={id}"], key_params=["id"])
-    def atualizar(id: str, payload: ToolUpdate) -> ToolOutDetail:
+    def update(id: str, payload: ToolUpdate) -> ToolOutDetail:
         oid = ensure_object_id(id)
         data = payload.model_dump(exclude_none=True)
 
@@ -69,16 +69,16 @@ class ToolService:
 
     @staticmethod
     @cache_evict(["tools:all", "tools:id={id}"], key_params=["id"])
-    def remover(id: str) -> bool:
-        # Verifica se existem credenciais cadatradas para esta tool
-        credencial_existente = credencial_tool_coll.find_one({"id_tool": id})
+    def delete(id: str) -> bool:
+        # Check if there are credentials registered for this tool
+        credencial_existente = tool_credentials_coll.find_one({"id_tool": id})
         if credencial_existente:
             raise BusinessDomainError("Existem credenciais cadastradas para esta tool. Exclua-as primeiro.")
 
-        # Verifica se existem agentes com esta tool vinculada
-        credencial_vinculada = agente_coll.find_one({"tools.tool.id": id})
+        # Check if there are agents with this tool linked
+        credencial_vinculada = agent_coll.find_one({"tools.tool.id": id})
         if credencial_vinculada:
-            raise BusinessDomainError("Existe um ou mais agente utilizando esta credencial")
+            raise BusinessDomainError("Existe um ou mais agent utilizando esta credencial")
 
         oid = ensure_object_id(id)
         result = tool_coll.delete_one({"_id": oid})
