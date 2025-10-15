@@ -13,11 +13,13 @@ from app.core.exceptions.handlers import (
 )
 
 from app.controllers import auth
+from app.controllers import assistente as assistente_ctrl
+from app.controllers import agente as agente_ctrl
 from app.controllers import modelo_ai as modelo_ai_ctrl
+from app.controllers import credencial_modelo_ai as credencial_modelo_ai_ctrl
 from app.controllers import tool as tool_ctrl
 from app.controllers import credencial_tool as credencial_tool_ctrl
-from app.controllers import credencial_modelo_ai as credencial_modelo_ai_ctrl
-from app.controllers import agente as agente_ctrl
+
 from app.core.translations import TRANSLATIONS
 
 # --- Carregar variáveis ---
@@ -34,8 +36,9 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 
 # --- Rotas ---
 app.include_router(auth.router)
-app.include_router(modelo_ai_ctrl.router)
-app.include_router(tool_ctrl.router)
-app.include_router(credencial_tool_ctrl.router)
-app.include_router(credencial_modelo_ai_ctrl.router)
+app.include_router(assistente_ctrl.router)
 app.include_router(agente_ctrl.router)
+app.include_router(modelo_ai_ctrl.router)
+app.include_router(credencial_tool_ctrl.router)
+app.include_router(tool_ctrl.router)
+app.include_router(credencial_modelo_ai_ctrl.router)

@@ -33,18 +33,19 @@ def get_agente_detail(id: str):
         {"$group": {
             "_id": "$_id",
             "nome": {"$first": "$nome"},
+            "descricao": {"$first": "$descricao"},
             "system_message": {"$first": "$system_message"},
             "visivel": {"$first": "$visivel"},
             "publico": {"$first": "$publico"},
             "ativo": {"$first": "$ativo"},
             "id_contratante": {"$first": "$id_contratante"},
             "funcoes": {"$first": "$funcoes"},
-            "tools": {"$push": "$tools"}
+            "tools": {"$push": "$tools"},
+            "contratantes": {"$first": "$contratantes"}
         }}
     ]
 
     cursor = collection.aggregate(pipeline)
-
-    docs = cursor.to_list(length=1)  # pega só o primeiro
+    docs = cursor.to_list(length=1)
     return docs[0] if docs else None
 

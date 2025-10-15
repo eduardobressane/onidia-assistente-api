@@ -5,6 +5,7 @@ import json
 
 from app.dataprovider.mongo.models.tool import collection as tool_coll
 from app.dataprovider.mongo.models.credencial_tool import collection as credencial_tool_coll
+from app.dataprovider.mongo.models.agente import collection as agente_coll
 from app.schemas.tool import (
     ToolCreate, ToolUpdate, ToolOutList, ToolOutDetail
 )
@@ -69,10 +70,15 @@ class ToolService:
     @staticmethod
     @cache_evict(["tools:all", "tools:id={id}"], key_params=["id"])
     def remover(id: str) -> bool:
-        # Verifica se existem credenciais vinculadas
+        # Verifica se existem credenciais cadatradas para esta tool
         credencial_existente = credencial_tool_coll.find_one({"id_tool": id})
         if credencial_existente:
             raise BusinessDomainError("Existem credenciais cadastradas para esta tool. Exclua-as primeiro.")
+
+        # Verifica se existem agentes com esta tool vinculada
+        credencial_vinculada = agente_coll.find_one({"tools.tool.id": id})
+        if credencial_vinculada:
+            raise BusinessDomainError("Existe um ou mais agente utilizando esta credencial")
 
         oid = ensure_object_id(id)
         result = tool_coll.delete_one({"_id": oid})
