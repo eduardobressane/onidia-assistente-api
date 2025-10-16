@@ -77,7 +77,6 @@ class AgentOutList(BaseModel):
     name: str
     description: str
     public: bool
-    visivel: bool
     enabled: bool
 
     @classmethod

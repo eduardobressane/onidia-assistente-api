@@ -16,6 +16,7 @@ from pymongo.errors import DuplicateKeyError
 
 from app.dataprovider.postgre.session import SessionLocal
 from app.dataprovider.postgre.repository.contractor import contractors_exists
+from app.dataprovider.mongo.models.tool import validate_existing_tools
 
 
 class AgentService:
@@ -31,7 +32,7 @@ class AgentService:
 
         cursor = agent_coll.find(filtro).sort("name", 1).skip(skip).limit(rpp)
 
-        items: list[AgenteOutList] = [AgenteOutList.from_raw(doc) for doc in cursor]
+        items: list[AgentOutList] = [AgentOutList.from_raw(doc) for doc in cursor]
 
         total = agent_coll.count_documents(filtro)
         total_pages = math.ceil(total / rpp) if rpp > 0 else 1
@@ -67,6 +68,8 @@ class AgentService:
             with SessionLocal() as db:
                 contractors_exists(db, payload.contractors)
 
+            validate_existing_tools(payload.tools)
+
             result = agent_coll.insert_one(to_insert)
             created = agent_coll.find_one({"_id": result.inserted_id})
             return AgentOutDetail.from_raw(created)
@@ -80,6 +83,8 @@ class AgentService:
 
         with SessionLocal() as db:
             contractors_exists(db, payload.contractors)
+
+        validate_existing_tools(payload.tools)
 
         try:
             updated = agent_coll.find_one_and_update(
