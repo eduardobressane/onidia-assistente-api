@@ -23,6 +23,16 @@ def get_agent_detail(id: str):
             "as": "tool_info"
         }},
         {"$unwind": {"path": "$tool_info", "preserveNullAndEmptyArrays": True}},
+
+        {"$unwind": {"path": "$categories", "preserveNullAndEmptyArrays": True}},
+        {"$lookup": {
+            "from": "category",
+            "localField": "categories._id",
+            "foreignField": "id",
+            "as": "category_info"
+        }},
+        {"$unwind": {"path": "$category_info", "preserveNullAndEmptyArrays": True}},
+
         {"$addFields": {
             "tools": {
                 "tool": {
@@ -32,6 +42,10 @@ def get_agent_detail(id: str):
                 },
                 "max": {"$ifNull": ["$tools.max", 1]},
                 "required": {"$ifNull": ["$tools.required", False]}
+            },
+            "categories": {
+                "id": "$category_info._id",
+                "name": "$category_info.name"
             }
         }},
         {"$group": {
@@ -39,9 +53,10 @@ def get_agent_detail(id: str):
             "name": {"$first": "$name"},
             "description": {"$first": "$description"},
             "system_message": {"$first": "$system_message"},
-            "public": {"$first": "$public"},
+            "is_public": {"$first": "$is_public"},
             "enabled": {"$first": "$enabled"},
             "contractor_id": {"$first": "$contractor_id"},
+            "categories": {"$push": "$categories"},
             "functions": {"$first": "$functions"},
             "tools": {"$push": "$tools"},
             "contractors": {"$first": "$contractors"}

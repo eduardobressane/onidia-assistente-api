@@ -17,7 +17,7 @@ from pymongo.errors import DuplicateKeyError
 from app.dataprovider.postgre.session import SessionLocal
 from app.dataprovider.postgre.repository.contractor import contractors_exists
 from app.dataprovider.mongo.models.tool import validate_existing_tools
-
+from app.dataprovider.mongo.models.category import validate_existing_categories
 
 class AgentService:
 
@@ -68,6 +68,9 @@ class AgentService:
             with SessionLocal() as db:
                 contractors_exists(db, payload.contractors)
 
+            if payload.category_type:
+                validate_existing_categories(payload.categories, "agent")
+
             validate_existing_tools(payload.tools)
 
             result = agent_coll.insert_one(to_insert)
@@ -83,6 +86,10 @@ class AgentService:
 
         with SessionLocal() as db:
             contractors_exists(db, payload.contractors)
+
+        categories = payload.categories or []
+        if categories:
+            validate_existing_categories(categories, "agent")
 
         validate_existing_tools(payload.tools)
 

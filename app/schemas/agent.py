@@ -5,6 +5,10 @@ from app.core.exceptions.types import NotFoundError, BadRequestError
 from bson import ObjectId
 import json
 
+class Category(BaseModel):
+    id: str = Field(...)
+    name: str = Field(...)
+
 class Function(BaseModel):
     code: str = Field(..., max_length=10)
     name: str = Field(..., max_length=150)
@@ -28,6 +32,7 @@ class AgentBase(BaseModel):
     system_message: str = Field(...)
     is_public: bool = Field(default=True)
     enabled: bool = Field(default=True)
+    categories: List[Category]
     functions: Optional[List[Function]] = None
     contractors: Optional[List[str]] = None
 
@@ -112,6 +117,13 @@ class AgentOutDetail(AgentBase):
         if not doc:
             return None
 
+        categories = []
+        for c in doc.get("categories", []):
+            categories.append({
+                "id": str(c.get("id")) if isinstance(c.get("id"), ObjectId) else c.get("id"),
+                "name": str(c.get("name")),
+            })
+
         tools = []
         for t in doc.get("tools", []):
             if "tool" in t:
@@ -153,6 +165,7 @@ class AgentOutDetail(AgentBase):
             description=doc.get("description"),
             system_message=doc.get("system_message"),
             enabled=doc.get("enabled"),
+            categories=categories,
             functions=doc.get("functions"),
             tools=tools,
             contractors=contractors,
@@ -167,6 +180,13 @@ class AgentOutInternal(AgentBase):
     def from_raw(cls, doc: dict) -> Optional["AgentOutInternal"]:
         if not doc:
             return None
+
+        categories = []
+        for c in doc.get("categories", []):
+            categories.append({
+                "id": str(c.get("id")) if isinstance(c.get("id"), ObjectId) else c.get("id"),
+                "name": str(c.get("name")),
+            })
 
         tools = []
         for t in doc.get("tools", []):
@@ -210,6 +230,7 @@ class AgentOutInternal(AgentBase):
             system_message=doc.get("system_message"),
             contractor_id=doc.get("contractor_id"),
             enabled=doc.get("enabled"),
+            categories=categories,
             functions=doc.get("functions"),
             tools=tools,
             contractors=contractors,

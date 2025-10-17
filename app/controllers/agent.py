@@ -52,7 +52,7 @@ def create(payload: AgentCreate, contractor_id: Optional[UUID] = Query(None), cu
 
 @router.put("/{id}", response_model=HttpResponse[AgentOutDetail], dependencies=[Depends(require_permissions(["*", "hafj0vsur6"]))])
 def update(id: str, payload: AgentUpdate, current_user: dict = Depends(get_current_user)):
-    agent: AgentOutInternal = AgentService.obter(id)
+    agent: AgentOutInternal = AgentService.get_by_id(id)
 
     # Validating whether the logged-in user can access the contractor's data
     validate_contractor_access(current_user, agent.contractor_id)
@@ -63,7 +63,7 @@ def update(id: str, payload: AgentUpdate, current_user: dict = Depends(get_curre
 
 @router.delete("/{id}", response_model=HttpResponse[None], dependencies=[Depends(require_permissions(["*", "hafj0zvbsy"]))])
 def delete(id: str, current_user: dict = Depends(get_current_user)):
-    agent: AgentOutInternal = AgentService.obter(id)
+    agent: AgentOutInternal = AgentService.get_by_id(id)
 
     # Validating whether the logged-in user can access the contractor's data
     validate_contractor_access(current_user, agent.contractor_id)
