@@ -19,6 +19,7 @@ from app.controllers import ai_model as ai_model_ctrl
 from app.controllers import ai_model_credentials as ai_model_credentials_ctrl
 from app.controllers import tool as tool_ctrl
 from app.controllers import tool_credentials as tool_credentials_ctrl
+from app.controllers import category as category_ctrl
 
 from app.core.translations import TRANSLATIONS
 
@@ -42,3 +43,4 @@ app.include_router(ai_model_ctrl.router)
 app.include_router(ai_model_credentials_ctrl.router)
 app.include_router(tool_ctrl.router)
 app.include_router(tool_credentials_ctrl.router)
+app.include_router(category_ctrl.router)

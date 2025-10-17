@@ -1,4 +1,4 @@
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Literal
 from uuid import UUID
 from pydantic import BaseModel, Field, model_validator, field_validator
 from app.core.exceptions.types import NotFoundError, BadRequestError
@@ -8,6 +8,7 @@ import json
 class Function(BaseModel):
     code: str = Field(..., max_length=10)
     name: str = Field(..., max_length=150)
+    action_type: Literal["GET", "SET"] = Field(...)
     description: str = Field(..., max_length=255)
     system_message: str
 
@@ -16,11 +17,16 @@ class Tool(BaseModel):
     name: Optional[str] = None
     scope: Optional[dict[str, Any]] = None
 
+class ToolInfo(BaseModel):
+    tool: Tool
+    max: Optional[int]
+    required: Optional[bool] = False
+
 class AgentBase(BaseModel):
     name: str = Field(..., max_length=150)
     description: str = Field(..., max_length=2048)
     system_message: str = Field(...)
-    public: bool = Field(default=True)
+    is_public: bool = Field(default=True)
     enabled: bool = Field(default=True)
     functions: Optional[List[Function]] = None
     contractors: Optional[List[str]] = None
@@ -65,18 +71,23 @@ class ToolCreateOrUpdate(BaseModel):
             raise NotFoundError(f"Tool com id {v} não existe")
         return v
 
+class ToolInfoCreateOrUpdate(BaseModel):
+    tool: ToolCreateOrUpdate
+    max: int
+    required: bool = Field(default=False)
+
 class AgentCreate(AgentBase):
-    tools: List[ToolCreateOrUpdate]
+    tools: List[ToolInfoCreateOrUpdate]
 
 class AgentUpdate(AgentBase):
-    tools: List[ToolCreateOrUpdate]
+    tools: List[ToolInfoCreateOrUpdate]
 
 #OUTPUTS
 class AgentOutList(BaseModel):
     id: str
     name: str
     description: str
-    public: bool
+    is_public: bool
     enabled: bool
 
     @classmethod
@@ -88,13 +99,13 @@ class AgentOutList(BaseModel):
             id=str(doc["_id"]),
             name=doc.get("name"),
             description=doc.get("description"),
-            public=doc.get("public"),
+            is_public=doc.get("is_public"),
             enabled=doc.get("enabled"),
         )
 
 class AgentOutDetail(AgentBase):
     id: str
-    tools: List[Tool]
+    tools: List[ToolInfo]
 
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["AgentOutDetail"]:
@@ -106,10 +117,14 @@ class AgentOutDetail(AgentBase):
             if "tool" in t:
                 tool_data = t["tool"]
                 tools.append(
-                    Tool(
-                        id=str(tool_data.get("id")),
-                        name=tool_data.get("name"),
-                        scope=tool_data.get("scope"),
+                    ToolInfo(
+                        tool=Tool(
+                            id=str(tool_data.get("id")),
+                            name=tool_data.get("name"),
+                            scope=tool_data.get("scope"),
+                        ),
+                        max=t.get("max"),
+                        required=t.get("required", False)
                     )
                 )
 
@@ -146,7 +161,7 @@ class AgentOutDetail(AgentBase):
 class AgentOutInternal(AgentBase):
     id: str
     contractor_id: Optional[str] = None
-    tools: List[Tool]
+    tools: List[ToolInfo]
 
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["AgentOutInternal"]:
@@ -158,10 +173,14 @@ class AgentOutInternal(AgentBase):
             if "tool" in t:
                 tool_data = t["tool"]
                 tools.append(
-                    Tool(
-                        id=str(tool_data.get("id")),
-                        name=tool_data.get("name"),
-                        scope=tool_data.get("scope"),
+                    ToolInfo(
+                        tool=Tool(
+                            id=str(tool_data.get("id")),
+                            name=tool_data.get("name"),
+                            scope=tool_data.get("scope"),
+                        ),
+                        max=t.get("max"),
+                        required=t.get("required", False)
                     )
                 )
 

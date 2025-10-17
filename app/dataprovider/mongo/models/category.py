@@ -1,7 +1,12 @@
 from app.dataprovider.mongo.base import db
-from app.core.exceptions.types import NotFoundError
+from pymongo import ASCENDING
 
 COLLECTION_NAME = "category"
 collection = db[COLLECTION_NAME]
 
-collection.create_index("name", unique=True)
+# index
+collection.create_index(
+    [("name", ASCENDING), ("category_type", ASCENDING)],
+    unique=True,
+    name="uniq_name_category_type"
+)

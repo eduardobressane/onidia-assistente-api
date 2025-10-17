@@ -24,10 +24,14 @@ def get_agent_detail(id: str):
         }},
         {"$unwind": {"path": "$tool_info", "preserveNullAndEmptyArrays": True}},
         {"$addFields": {
-            "tools.tool": {
-                "id": "$tool_info._id",
-                "name": "$tool_info.name",
-                "scope": "$tool_info.scope"
+            "tools": {
+                "tool": {
+                    "id": "$tool_info._id",
+                    "name": "$tool_info.name",
+                    "scope": "$tool_info.scope"
+                },
+                "max": {"$ifNull": ["$tools.max", 1]},
+                "required": {"$ifNull": ["$tools.required", False]}
             }
         }},
         {"$group": {
