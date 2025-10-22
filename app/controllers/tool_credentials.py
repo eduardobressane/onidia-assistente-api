@@ -9,7 +9,7 @@ from app.schemas.tool_credentials import (
     ToolCredentialsCreate, ToolCredentialsUpdate, ToolCredentialsOutList, ToolCredentialsOutDetail, ToolCredentialsInternal
 )
 from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError
-from app.core.security import require_permissions, get_current_user, validate_and_alter_contractor
+from app.core.security import require_permissions, get_current_user, validate_and_alter_contractor, validate_contractor_access
 from app.schemas.http_response import HttpResponse
 from app.schemas.http_response_advice import ok, created, updated, deleted
 from fastapi.encoders import jsonable_encoder
@@ -19,8 +19,7 @@ router = APIRouter(prefix="/tools", tags=["Tools Credentials"])
 
 @router.get("/{tool_id}/credentials", response_model=HttpResponse[List[ToolCredentialsOutList]], dependencies=[Depends(require_permissions(["*", "hafiy9ighm"]))])
 def get_all(tool_id: str, contractor_id: Optional[UUID] = Query(None), current_user: dict = Depends(get_current_user)):
-    if contractor_id is None:
-        contractor_id = validate_and_alter_contractor(current_user, current_user.get("cid"))
+    contractor_id = validate_and_alter_contractor(current_user, contractor_id)
 
     rows: List[ToolCredentialsOutList] = ToolCredentialsService.get_all(tool_id, contractor_id)
     payload = [ToolCredentialsOutList.from_raw(r) for r in rows]
@@ -47,8 +46,7 @@ def create(
     contractor_id: Optional[UUID] = Query(None),
     current_user: dict = Depends(get_current_user),
 ):
-    if contractor_id is None:
-        contractor_id = validate_and_alter_contractor(current_user, current_user.get("cid"))
+    contractor_id = validate_and_alter_contractor(current_user, contractor_id)
 
     data: ToolCredentialsOutDetail = ToolCredentialsService.create(
         tool_id, contractor_id, payload

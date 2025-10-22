@@ -5,6 +5,11 @@ from app.core.exceptions.types import NotFoundError, BadRequestError
 from bson import ObjectId
 import json
 
+class OCP(BaseModel):
+    id: str = Field(...)
+    name: str = Field(...)
+    type: str = Field(...)
+
 class Category(BaseModel):
     id: str = Field(...)
     name: str = Field(...)
@@ -32,6 +37,7 @@ class AgentBase(BaseModel):
     system_message: str = Field(...)
     is_public: bool = Field(default=True)
     enabled: bool = Field(default=True)
+    ocps: List[OCP]
     categories: List[Category]
     functions: Optional[List[Function]] = None
     contractors: Optional[List[str]] = None
@@ -66,6 +72,16 @@ class AgentBase(BaseModel):
         return self
 
 #CREATE/UPDATE
+class OCPCreateOrUpdate(BaseModel):
+    id: str
+
+    @field_validator("id")
+    @classmethod
+    def validate_object_id(cls, v: str) -> str:
+        if not ObjectId.is_valid(v):
+            raise NotFoundError(f"OCP com id {v} não existe")
+        return v
+
 class ToolCreateOrUpdate(BaseModel):
     id: str
 
@@ -82,9 +98,11 @@ class ToolInfoCreateOrUpdate(BaseModel):
     required: bool = Field(...)
 
 class AgentCreate(AgentBase):
+    ocps: List[OCPCreateOrUpdate]
     tools: Optional[List[ToolInfoCreateOrUpdate]] = None
 
 class AgentUpdate(AgentBase):
+    ocps: List[OCPCreateOrUpdate]
     tools: Optional[List[ToolInfoCreateOrUpdate]] = None
 
 #OUTPUTS
@@ -112,6 +130,7 @@ class AgentOutList(BaseModel):
 
 class AgentOutDetail(AgentBase):
     id: str
+    ocps: List[OCP]
     tools: List[ToolInfo]
 
     model_config = ConfigDict(populate_by_name=True, exclude_none=False)
@@ -125,8 +144,17 @@ class AgentOutDetail(AgentBase):
         for c in doc.get("categories", []):
             categories.append({
                 "id": str(c.get("id")) if isinstance(c.get("id"), ObjectId) else c.get("id"),
-                "name": str(c.get("name")),
+                "name": str(c.get("name"))
             })
+
+        ocps = []
+        for o in doc.get("ocps", []):
+            ocps.append(
+                OCP(
+                    id=str(o.get("id")),
+                    name=o.get("name"),
+                    type=o.get("type")
+                ))
 
         tools = []
         for t in doc.get("tools", []):
@@ -170,6 +198,7 @@ class AgentOutDetail(AgentBase):
             system_message=doc.get("system_message"),
             enabled=doc.get("enabled"),
             categories=categories,
+            ocps=ocps,
             functions=doc.get("functions"),
             tools=tools,
             contractors=contractors,
@@ -178,6 +207,7 @@ class AgentOutDetail(AgentBase):
 class AgentOutInternal(AgentBase):
     id: str
     contractor_id: Optional[str] = None
+    ocps: List[OCP]
     tools: List[ToolInfo]
 
     model_config = ConfigDict(populate_by_name=True, exclude_none=False)
@@ -193,6 +223,15 @@ class AgentOutInternal(AgentBase):
                 "id": str(c.get("id")) if isinstance(c.get("id"), ObjectId) else c.get("id"),
                 "name": str(c.get("name")),
             })
+
+        ocps = []
+        for o in doc.get("ocps", []):
+            ocps.append(
+                OCP(
+                    id=str(o.get("id")),
+                    name=o.get("name"),
+                    type=o.get("type")
+                ))
 
         tools = []
         for t in doc.get("tools", []):
@@ -237,6 +276,7 @@ class AgentOutInternal(AgentBase):
             contractor_id=doc.get("contractor_id"),
             enabled=doc.get("enabled"),
             categories=categories,
+            ocps=ocps,
             functions=doc.get("functions"),
             tools=tools,
             contractors=contractors,

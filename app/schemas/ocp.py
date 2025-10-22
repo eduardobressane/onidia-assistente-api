@@ -114,9 +114,22 @@ class OCPOutDetail(OCPBase):
     def from_raw(cls, doc: dict) -> Optional["OCPOutDetail"]:
         if not doc:
             return None
+
+        # Faz uma cópia profunda de ocp (para não alterar o doc original)
+        import copy
+        ocp_data = copy.deepcopy(doc.get("ocp", {}))
+
+        # Procura por headers em ocp.metadata.source.headers
+        try:
+            headers = ocp_data.get("metadata", {}).get("source", {}).get("headers", {})
+            if isinstance(headers, dict):
+                ocp_data["metadata"]["source"]["headers"] = {k: "****" for k in headers.keys()}
+        except Exception:
+            pass  # Evita erro caso alguma chave intermediária não exista
+
         return cls(
             id=str(doc.get("_id")),
             name=doc.get("name"),
             enabled=doc.get("enabled", True),
-            ocp=doc.get("ocp")
+            ocp=ocp_data
         )

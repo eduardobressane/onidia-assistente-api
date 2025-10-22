@@ -6,7 +6,7 @@ from uuid import UUID
 import math
 
 from app.dataprovider.mongo.models.agent import collection as agent_coll
-from app.dataprovider.mongo.models.agent import get_agent_detail, validate_tools
+from app.dataprovider.mongo.models.agent import get_agent_detail, validate_tools, validate_ocps
 from app.schemas.agent import (
     AgentCreate, AgentUpdate, AgentOutList, AgentOutDetail, AgentOutInternal
 )
@@ -15,6 +15,7 @@ from app.core.utils.mongo import ensure_object_id
 from pymongo.errors import DuplicateKeyError
 
 from app.dataprovider.postgre.session import SessionLocal
+from app.dataprovider.mongo.base import db as mongo_db
 from app.dataprovider.postgre.repository.contractor import contractor_exists, contractors_exists
 from app.dataprovider.mongo.models.category import validate_existing_categories
 
@@ -49,7 +50,6 @@ class AgentService:
     @staticmethod
     def get_by_id(id: str) -> AgentOutInternal:
         doc = get_agent_detail(id)
-
         if not doc:
             raise NotFoundError("Agente não encontrado")
 
@@ -74,13 +74,14 @@ class AgentService:
             with SessionLocal() as db:
                 contractors_exists(db, payload.contractors)
 
-            if payload.category_type:
+            validate_ocps(mongo_db, contractor_id, payload.ocps)
+            validate_tools(mongo_db, payload.tools)
+
+            if payload.categories:
                 validate_existing_categories(payload.categories, "agent")
 
-            validate_tools(payload.tools)
-
             result = agent_coll.insert_one(to_insert)
-            created = agent_coll.find_one({"_id": result.inserted_id})
+            created = get_agent_detail(result.inserted_id)
             return AgentOutDetail.from_raw(created)
         except DuplicateKeyError:
             raise DuplicateKeyDomainError("Já existe um agente com este nome")
@@ -88,16 +89,17 @@ class AgentService:
     @staticmethod
     def update(id: str, payload: AgentUpdate) -> AgentOutDetail:
         oid = ensure_object_id(id)
-        data = payload.model_dump(exclude_none=True)
+        data = payload.model_dump()
 
         with SessionLocal() as db:
             contractors_exists(db, payload.contractors)
 
+        validate_ocps(mongo_db, None, payload.ocps)
+        validate_tools(mongo_db, payload.tools)
+
         categories = payload.categories or []
         if categories:
             validate_existing_categories(categories, "agent")
-
-        validate_tools(payload.tools)
 
         try:
             updated = agent_coll.find_one_and_update(
@@ -111,6 +113,7 @@ class AgentService:
         if not updated:
             raise NotFoundError("Agente não encontrado")
 
+        updated = get_agent_detail(oid)
         return AgentOutDetail.from_raw(updated)
 
     @staticmethod

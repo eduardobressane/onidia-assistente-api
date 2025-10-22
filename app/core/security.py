@@ -215,9 +215,14 @@ def get_usuario_e_perfis(uid: str) -> Dict[str, Any]:
     }
 
 def validate_and_alter_contractor(current_user: dict, contractor_id: UUID | None):
-    if contractor_id is None and "*" in current_user.get("rules", []):
+    if contractor_id is None:
         contractor_id = current_user.get("cid")
-        return contractor_id
-    elif contractor_id is None:
+    elif "*" not in current_user.get("rules", []):
         raise ForbiddenError("Acesso negado")
+
     return contractor_id
+
+def validate_contractor_access(current_user: dict, contractor_id: UUID | None):
+    if contractor_id != current_user.get("cid") and "*" not in current_user.get("rules", []):
+        raise ForbiddenError("Acesso negado")
+   

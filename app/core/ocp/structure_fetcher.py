@@ -1,5 +1,5 @@
 import requests
-from typing import Dict, List, Optional, Literal, Any
+from typing import Dict, Optional, Literal, Any
 from app.core.exceptions.types import BadRequestError
 
 
@@ -12,7 +12,7 @@ class StructureFetcher:
     def get_structure(
         structure_type: Literal["mcp", "langserve"],
         url: str,
-        headers: Optional[List[Dict[str, str]]] = None,
+        headers: Optional[Dict[str, str]] = None,
     ) -> Dict:
         """
         Busca a estrutura JSON de um servidor MCP ou LangServe.
@@ -21,9 +21,13 @@ class StructureFetcher:
 
         # Normaliza headers no formato esperado pelo requests
         merged_headers: Dict[str, str] = {}
+
         if headers:
-            for header_dict in headers:
-                merged_headers.update(header_dict)
+            if not isinstance(headers, dict):
+                raise BadRequestError(
+                    f"O campo 'headers' deve ser um objeto (dict) com chave e valor. Recebido: {type(headers)}"
+                )
+            merged_headers.update(headers)
 
         try:
             if structure_type == "mcp":
@@ -48,7 +52,6 @@ class StructureFetcher:
             raise BadRequestError(f"Erro ao buscar estrutura em {url}: {e}")
 
         except Exception as e:
-            # Captura qualquer outro erro inesperado
             raise BadRequestError(f"Erro inesperado ao buscar estrutura: {e}")
 
     # --- Métodos privados ---
