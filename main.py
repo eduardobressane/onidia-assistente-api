@@ -15,12 +15,15 @@ from app.core.exceptions.handlers import (
 from app.controllers import auth
 from app.controllers import assistant as assistant_ctrl
 from app.controllers import agent as agent_ctrl
+from app.controllers import credential_type as credential_type_ctrl
+from app.controllers import credential as credential_ctrl
 from app.controllers import ai_model as ai_model_ctrl
 from app.controllers import ai_model_credentials as ai_model_credentials_ctrl
 from app.controllers import tool as tool_ctrl
 from app.controllers import tool_credentials as tool_credentials_ctrl
-from app.controllers import category as category_ctrl
+from app.controllers import tag as tag_ctrl
 from app.controllers import ocp as ocp_ctrl
+from app.controllers import authenticator as authenticator_ctrl
 
 from app.core.translations import TRANSLATIONS
 
@@ -40,9 +43,12 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 app.include_router(auth.router)
 app.include_router(assistant_ctrl.router)
 app.include_router(agent_ctrl.router)
+app.include_router(credential_type_ctrl.router)
+app.include_router(credential_ctrl.router)
 app.include_router(ai_model_ctrl.router)
 app.include_router(ai_model_credentials_ctrl.router)
 app.include_router(tool_ctrl.router)
 app.include_router(tool_credentials_ctrl.router)
-app.include_router(category_ctrl.router)
+app.include_router(tag_ctrl.router)
 app.include_router(ocp_ctrl.router)
+app.include_router(authenticator_ctrl.router)

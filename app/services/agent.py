@@ -17,7 +17,7 @@ from pymongo.errors import DuplicateKeyError
 from app.dataprovider.postgre.session import SessionLocal
 from app.dataprovider.mongo.base import db as mongo_db
 from app.dataprovider.postgre.repository.contractor import contractor_exists, contractors_exists
-from app.dataprovider.mongo.models.category import validate_existing_categories
+from app.dataprovider.mongo.models.tag import validate_existing_tags
 
 
 class AgentService:
@@ -77,8 +77,8 @@ class AgentService:
             validate_ocps(mongo_db, contractor_id, payload.ocps)
             validate_tools(mongo_db, payload.tools)
 
-            if payload.categories:
-                validate_existing_categories(payload.categories, "agent")
+            if payload.tags:
+                validate_existing_tags(payload.tags, "agent")
 
             result = agent_coll.insert_one(to_insert)
             created = get_agent_detail(result.inserted_id)
@@ -97,9 +97,9 @@ class AgentService:
         validate_ocps(mongo_db, None, payload.ocps)
         validate_tools(mongo_db, payload.tools)
 
-        categories = payload.categories or []
-        if categories:
-            validate_existing_categories(categories, "agent")
+        tags = payload.tags or []
+        if tags:
+            validate_existing_tags(tags, "agent")
 
         try:
             updated = agent_coll.find_one_and_update(

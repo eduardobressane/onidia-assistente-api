@@ -10,7 +10,7 @@ class OCP(BaseModel):
     name: str = Field(...)
     type: str = Field(...)
 
-class Category(BaseModel):
+class Tag(BaseModel):
     id: str = Field(...)
     name: str = Field(...)
 
@@ -38,7 +38,7 @@ class AgentBase(BaseModel):
     is_public: bool = Field(default=True)
     enabled: bool = Field(default=True)
     ocps: List[OCP]
-    categories: List[Category]
+    tags: List[Tag]
     functions: Optional[List[Function]] = None
     contractors: Optional[List[str]] = None
 
@@ -140,9 +140,9 @@ class AgentOutDetail(AgentBase):
         if not doc:
             return None
 
-        categories = []
-        for c in doc.get("categories", []):
-            categories.append({
+        tags = []
+        for c in doc.get("tags", []):
+            tags.append({
                 "id": str(c.get("id")) if isinstance(c.get("id"), ObjectId) else c.get("id"),
                 "name": str(c.get("name"))
             })
@@ -197,7 +197,7 @@ class AgentOutDetail(AgentBase):
             description=doc.get("description"),
             system_message=doc.get("system_message"),
             enabled=doc.get("enabled"),
-            categories=categories,
+            tags=tags,
             ocps=ocps,
             functions=doc.get("functions"),
             tools=tools,
@@ -217,9 +217,9 @@ class AgentOutInternal(AgentBase):
         if not doc:
             return None
 
-        categories = []
-        for c in doc.get("categories", []):
-            categories.append({
+        tags = []
+        for c in doc.get("tags", []):
+            tags.append({
                 "id": str(c.get("id")) if isinstance(c.get("id"), ObjectId) else c.get("id"),
                 "name": str(c.get("name")),
             })
@@ -275,7 +275,7 @@ class AgentOutInternal(AgentBase):
             system_message=doc.get("system_message"),
             contractor_id=doc.get("contractor_id"),
             enabled=doc.get("enabled"),
-            categories=categories,
+            tags=tags,
             ocps=ocps,
             functions=doc.get("functions"),
             tools=tools,

@@ -5,30 +5,18 @@ from urllib.parse import urlparse
 
 from app.core.exceptions.types import NotFoundError, BusinessDomainError
 
-from app.dataprovider.mongo.models.ai_model import collection as ai_model_coll
-from app.dataprovider.mongo.models.tool import collection as tool_coll
+from app.dataprovider.mongo.models.credential_type import collection as credential_type_coll
 
 class ValidateCredentialsUtils:
 
     @staticmethod
-    def validate_ai_model_credentials(ai_model_id: str, credentials: dict) -> dict:
-        # Valida o payload.credentials de acordo com o ai_model.scope.fields
-        ai_model = ai_model_coll.find_one({"_id": ObjectId(ai_model_id), "enabled": True})
-        if not ai_model:
-            raise NotFoundError("AI Model não encontrado ou desabilitado")
+    def validate_credentials(credential_type_id: str, credentials: dict) -> dict:
+        # Valida o payload.credentials de acordo com o credential_type.scope.fields
+        credential_type = credential_type_coll.find_one({"_id": ObjectId(credential_type_id), "enabled": True})
+        if not credential_type:
+            raise NotFoundError("Tipo de credencial não encontrado ou desabilitado")
 
-        expected_fields = {f["name"]: f for f in ai_model.get("scope", {}).get("fields", [])}
-
-        return ValidateCredentialsUtils._validate_credentials(expected_fields, credentials)
-
-    @staticmethod
-    def validate_tool_credentials(tool_id: str, credentials: dict) -> dict:
-        # Valida o payload.credentials de acordo com o tool.scope.fields
-        tool = tool_coll.find_one({"_id": ObjectId(tool_id), "enabled": True})
-        if not tool:
-            raise NotFoundError("Tool não encontrada ou desabilitada")
-
-        expected_fields = {f["name"]: f for f in tool.get("scope", {}).get("fields", [])}
+        expected_fields = {f["name"]: f for f in credential_type.get("scope", {}).get("fields", [])}
 
         return ValidateCredentialsUtils._validate_credentials(expected_fields, credentials)
 

@@ -11,7 +11,7 @@ from app.schemas.http_response import HttpResponse
 from app.schemas.http_response_advice import ok, created, updated, deleted
 from app.core.security import require_permissions, get_current_user, validate_and_alter_contractor
 
-router = APIRouter(prefix="/ocp", tags=["OCP"])
+router = APIRouter(prefix="/ocps", tags=["OCPs"])
 
 
 @router.get("", response_model=HttpResponse[List[OCPOutList]], dependencies=[Depends(require_permissions(["*", "hc9v6zj3sc"]))])

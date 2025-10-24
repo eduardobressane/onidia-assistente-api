@@ -1,21 +1,21 @@
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field
 
-class CategoryBase(BaseModel):
+class TagBase(BaseModel):
     name: str = Field(..., max_length=150)
     enabled: bool = Field(default=True)
 
-class CategoryCreate(CategoryBase):
-    category_type: Literal["agent"] = Field(...)
+class TagCreate(TagBase):
+    tag_type: Literal["agent"] = Field(...)
 
-class CategoryUpdate(CategoryBase):
+class TagUpdate(TagBase):
     pass
 
-class CategoryOutList(CategoryBase):
+class TagOutList(TagBase):
     id: str
 
     @classmethod
-    def from_raw(cls, doc: dict) -> "CategoryOutList":
+    def from_raw(cls, doc: dict) -> "TagOutList":
         if not doc:
             return None
         return cls(
@@ -24,11 +24,11 @@ class CategoryOutList(CategoryBase):
             enabled=doc.get("enabled", True)
         )
 
-class CategoryOutDetail(CategoryBase):
+class TagOutDetail(TagBase):
     id: str
 
     @classmethod
-    def from_raw(cls, doc: dict) -> "CategoryOutDetail":
+    def from_raw(cls, doc: dict) -> "TagOutDetail":
         if not doc:
             return None
         return cls(
