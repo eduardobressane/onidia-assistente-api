@@ -190,7 +190,7 @@ class AssistantOutInternal(BaseModel):
     def from_raw(cls, doc: dict) -> Optional["AssistantOutInternal"]:
         if not doc:
             return None
-        print(doc)
+        
         agents = []
         for a in doc.get("agents", []):
             if "agent" in a:

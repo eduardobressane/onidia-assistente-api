@@ -161,6 +161,7 @@ def get_assistant_detail(id: str):
         for a in assistant["agents"]
         if a.get("ai_model") and a["ai_model"].get("id")
     ]
+    print(model_ids)
     if model_ids:
         creds = {
             str(c["_id"]): c["description"]

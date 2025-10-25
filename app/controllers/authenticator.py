@@ -19,7 +19,7 @@ router = APIRouter(prefix="/authenticators", tags=["Authenticators"])
 @router.get(
     "",
     response_model=HttpResponse[List[AuthenticatorOutList]],
-    dependencies=[Depends(require_permissions(["*", "hc9auth1"]))],
+    dependencies=[Depends(require_permissions(["*", "hcdg62e8ho"]))],
 )
 def get_all(
     contractor_id: Optional[UUID] = Query(None),
@@ -40,7 +40,7 @@ def get_all(
 @router.get(
     "/{id}",
     response_model=AuthenticatorOutDetail,
-    dependencies=[Depends(require_permissions(["*", "hc9auth2"]))],
+    dependencies=[Depends(require_permissions(["*", "hcdg6h72dy"]))],
 )
 def get_by_id(id: str):
     """
@@ -53,7 +53,7 @@ def get_by_id(id: str):
 @router.post(
     "",
     response_model=HttpResponse[AuthenticatorOutDetail],
-    dependencies=[Depends(require_permissions(["*", "hc9auth3"]))],
+    dependencies=[Depends(require_permissions(["*", "hcdg7330ey"]))],
 )
 def create(
     payload: AuthenticatorCreate,
@@ -71,7 +71,7 @@ def create(
 @router.put(
     "/{id}",
     response_model=HttpResponse[AuthenticatorOutDetail],
-    dependencies=[Depends(require_permissions(["*", "hc9auth4"]))],
+    dependencies=[Depends(require_permissions(["*", "hcdg7dippn"]))],
 )
 def update(id: str, payload: AuthenticatorUpdate):
     """
@@ -84,7 +84,7 @@ def update(id: str, payload: AuthenticatorUpdate):
 @router.delete(
     "/{id}",
     response_model=HttpResponse[None],
-    dependencies=[Depends(require_permissions(["*", "hc9auth5"]))],
+    dependencies=[Depends(require_permissions(["*", "hcdg6rqxzz"]))],
 )
 def delete(id: str):
     """
