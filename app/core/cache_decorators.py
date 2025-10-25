@@ -1,7 +1,7 @@
 import functools
 import inspect
 from typing import Callable, Any, List, Optional
-from app.core.cache import cache_get_json, cache_set_json, cache_delete
+from app.core.cache import cache_get_json, cache_set_json, cache_delete, cache_delete_prefix
 from app.core.logger_config import debug, error
 
 
@@ -61,7 +61,7 @@ def cacheable(
     return decorator
 
 
-def cache_evict(keys: list[str], key_params: list[str] = None):
+def cache_evict(keys: list[str], key_params: list[str] = None, match_prefix: bool = False):
     def decorator(func):
         @functools.wraps(func)
         def wrapper(*args, **kwargs):
@@ -73,14 +73,17 @@ def cache_evict(keys: list[str], key_params: list[str] = None):
             params = bound.arguments
 
             for key_prefix in keys:
-                # suporta placeholders no estilo "{param}"
                 try:
                     cache_key = key_prefix.format(**params)
                 except KeyError:
                     cache_key = key_prefix
 
-                cache_delete(cache_key)
-                debug(f"[CACHE DELETE] {cache_key}")
+                if match_prefix:
+                    cache_delete_prefix(cache_key)
+                else:
+                    cache_delete(cache_key)
+
+                debug(f"[CACHE DELETE] {cache_key} (prefix={match_prefix})")
 
             return result
         return wrapper

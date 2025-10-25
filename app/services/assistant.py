@@ -7,7 +7,7 @@ import math
 
 from app.dataprovider.mongo.models.assistant import collection as assistant_coll
 from app.dataprovider.mongo.models.agent import collection as agent_coll
-from app.dataprovider.mongo.models.assistant import get_assistant_detail, validate_tools
+from app.dataprovider.mongo.models.assistant import get_assistant_detail, validate_tools, validate_ai_model
 from app.schemas.assistant import (
     AssistantCreate, 
     AssistantUpdate, 
@@ -68,9 +68,12 @@ class AssistantService:
             to_insert = payload.model_dump()
             to_insert["contractor_id"] = str(contractor_id)
 
+            #validando ai_model
+            validate_ai_model(payload.ai_model.id)
+
             # Validando as tools cadastradas
             for agent_payload in payload.agents:
-                agent_id = agent_payload.agent.id
+                agent_id = ensure_object_id(agent_payload.agent.id)
                 agent_config = agent_coll.find_one({"_id": agent_id})
                 if not agent_config:
                     raise NotFoundError(f"Agente {agent_id} não encontrado.")
@@ -89,7 +92,7 @@ class AssistantService:
 
         # Validando as tools cadastradas
         for agent_payload in payload.agents:
-            agent_id = agent_payload.agent.id
+            agent_id = ensure_object_id(agent_payload.agent.id)
             agent_config = agent_coll.find_one({"_id": agent_id})
             if not agent_config:
                 raise NotFoundError(f"Agente {agent_id} não encontrado.")

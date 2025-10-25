@@ -72,6 +72,7 @@ class AgentBase(BaseModel):
         return self
 
 #CREATE/UPDATE
+
 class OCPCreateOrUpdate(BaseModel):
     id: str
 
@@ -81,6 +82,9 @@ class OCPCreateOrUpdate(BaseModel):
         if not ObjectId.is_valid(v):
             raise NotFoundError(f"OCP com id {v} não existe")
         return v
+
+class TagCreateOrUpdate(BaseModel):
+    id: str = Field(...)
 
 class ToolCreateOrUpdate(BaseModel):
     id: str
@@ -99,10 +103,12 @@ class ToolInfoCreateOrUpdate(BaseModel):
 
 class AgentCreate(AgentBase):
     ocps: List[OCPCreateOrUpdate]
+    tags: List[TagCreateOrUpdate]
     tools: Optional[List[ToolInfoCreateOrUpdate]] = None
 
 class AgentUpdate(AgentBase):
     ocps: List[OCPCreateOrUpdate]
+    tags: List[TagCreateOrUpdate]
     tools: Optional[List[ToolInfoCreateOrUpdate]] = None
 
 #OUTPUTS

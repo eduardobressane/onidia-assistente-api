@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Literal
 from fastapi import APIRouter, Depends, UploadFile, File
 
 from app.services.credential_type import CredentialTypeService
@@ -16,8 +16,8 @@ router = APIRouter(prefix="/credentials_types", tags=["Credentials Types"])
 
 
 @router.get("", response_model=HttpResponse[List[CredentialTypeOutList]], dependencies=[Depends(require_permissions(["*", "hafinjvq6t"]))])
-def get_all():
-    credentials_types: List[CredentialTypeOutList] = CredentialTypeService.get_all()
+def get_all(kind: Literal["ai_models", "tools"] = None):
+    credentials_types: List[CredentialTypeOutList] = CredentialTypeService.get_all(kind)
     return ok(total=len(credentials_types), data=credentials_types)
 
 

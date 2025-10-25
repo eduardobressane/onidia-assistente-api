@@ -1,5 +1,10 @@
+import os
+from dotenv import load_dotenv
+
 from typing import Optional, List, Literal
 from pydantic import BaseModel, Field, ConfigDict
+
+URL_BASE_IMG_PUBLIC = os.getenv("URL_BASE_IMG_PUBLIC")
 
 class ScopeField(BaseModel):
     name: str = Field(...)
@@ -14,7 +19,7 @@ class Scope(BaseModel):
 
 class CredentialTypeBase(BaseModel):
     name: str = Field(..., max_length=150)
-    kind: Literal["ai_model", "tools"] = Field(...)
+    kind: Literal["ai_models", "tools"] = Field(...)
     enabled: bool = Field(default=True)
 
 # Create e Update
@@ -28,7 +33,7 @@ class CredentialTypeOutList(CredentialTypeBase):
     id: str
     image: Optional[str]
 
-    model_config = ConfigDict(populate_by_name=True, exclude_none=False)
+    model_config = ConfigDict(populate_by_name=True)
 
     @classmethod
     def from_raw(cls, doc: dict) -> "CredentialTypeOutList":
@@ -38,7 +43,7 @@ class CredentialTypeOutList(CredentialTypeBase):
             id=str(doc["_id"]),
             name=doc.get("name"),
             kind=doc.get("kind"),
-            image=f"http://blablabla/{doc.get('_id')}" if doc.get("has_image") else None,
+            image=f"{URL_BASE_IMG_PUBLIC}/credentials_types/{doc.get('_id')}" if doc.get("has_image") else None,
             enabled=doc.get("enabled", True)
         )
 
@@ -47,7 +52,7 @@ class CredentialTypeOutDetail(CredentialTypeBase):
     image: Optional[str]
     scope: Optional[Scope] = None
 
-    model_config = ConfigDict(populate_by_name=True, exclude_none=False)
+    model_config = ConfigDict(populate_by_name=True)
 
     @classmethod
     def from_raw(cls, doc: dict) -> "CredentialTypeOutDetail":
@@ -57,7 +62,7 @@ class CredentialTypeOutDetail(CredentialTypeBase):
             id=str(doc["_id"]),
             name=doc.get("name"),
             kind=doc.get("kind"),
-            image=f"http://blablabla/{doc.get('_id')}" if doc.get("has_image") else None,
+            image=f"{URL_BASE_IMG_PUBLIC}/credentials_types/{doc.get('_id')}" if doc.get("has_image") else None,
             enabled=doc.get("enabled", True),
             scope=doc.get("scope")
         )

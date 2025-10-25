@@ -1,7 +1,8 @@
 from app.dataprovider.mongo.base import db
 from pymongo import ASCENDING
 from bson import ObjectId
-from app.core.exceptions.types import NotFoundError
+from app.core.exceptions.types import NotFoundError 
+from app.core.utils.mongo import ensure_object_id
 
 COLLECTION_NAME = "tag"
 collection = db[COLLECTION_NAME]
@@ -14,10 +15,10 @@ collection.create_index(
 )
 
 def validate_existing_tags(tags: list[dict], tag_type: str):
-    for c in tags:
-        tag_id = c["id"] if isinstance(c, dict) else c.id
+    for t in tags:
+        tag_id = ensure_object_id(t.id)
         exists = collection.find_one({
-            "_id": ObjectId(tag_id),
+            "_id": tag_id,
             "tag_type": tag_type
         })
 

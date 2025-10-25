@@ -20,7 +20,7 @@ class S3Service:
     def upload_public_file(
         self,
         file: UploadFile,
-        directory: str = "ai_models",
+        directory: str,
         filename: Optional[str] = None
     ) -> Optional[str]:
         """

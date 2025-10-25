@@ -3,11 +3,12 @@ from app.core.exceptions.types import BusinessDomainError, NotFoundError
 from bson import ObjectId
 from pymongo import ASCENDING
 from uuid import UUID
+from app.core.utils.mongo import ensure_object_id
 
 COLLECTION_NAME = "agent"
 collection = db[COLLECTION_NAME]
 
-tool_collection = db["tool"]
+credential_collection = db["credential"]
 ocp_collection = db["ocp"]
 
 # index
@@ -20,72 +21,157 @@ collection.create_index(
 def get_agent_detail(id: str):
     pipeline = [
         {"$match": {"_id": ObjectId(id)}},
-        {"$unwind": {"path": "$ocps", "preserveNullAndEmptyArrays": True}},
-        {"$lookup": {
-            "from": "ocp",
-            "localField": "ocps._id",
-            "foreignField": "id",
-            "as": "ocp_info"
-        }},
-        {"$unwind": {"path": "$ocp_info", "preserveNullAndEmptyArrays": True}},
 
-        {"$unwind": {"path": "$tools", "preserveNullAndEmptyArrays": True}},
-        {"$lookup": {
-            "from": "tool",
-            "localField": "tools._id",
-            "foreignField": "id",
-            "as": "tool_info"
-        }},
-        {"$unwind": {"path": "$tool_info", "preserveNullAndEmptyArrays": True}},
-
-        {"$unwind": {"path": "$tags", "preserveNullAndEmptyArrays": True}},
-        {"$lookup": {
-            "from": "tag",
-            "localField": "tags._id",
-            "foreignField": "id",
-            "as": "tag_info"
-        }},
-        {"$unwind": {"path": "$tag_info", "preserveNullAndEmptyArrays": True}},
-
-        {"$addFields": {
-            "ocps": {
-                "id": "$ocp_info._id",
-                "name": {"$ifNull": ["$ocp_info.name", ""]},
-                "type": {"$ifNull": ["$ocp_info.ocp.metadata.source.type", ""]}
-            },
-            "tools": {
-                "tool": {
-                    "id": "$tool_info._id",
-                    "name": "$tool_info.name",
-                    "scope": "$tool_info.scope"
-                },
-                "max": {"$ifNull": ["$tools.max", 1]},
-                "required": {"$ifNull": ["$tools.required", False]}
-            },
-            "tags": {
-                "id": "$tag_info._id",
-                "name": "$tag_info.name"
+        # 🔹 Lookup OCPs
+        {
+            "$lookup": {
+                "from": "ocp",
+                "let": {"ocp_ids": "$ocps.id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$in": [{"$toString": "$_id"}, {"$ifNull": ["$$ocp_ids", []]}]
+                            }
+                        }
+                    },
+                    {
+                        "$project": {
+                            "id": {"$toString": "$_id"},
+                            "name": 1,
+                            "type": "$ocp.metadata.source.type"
+                        }
+                    }
+                ],
+                "as": "ocps"
             }
-        }},
-        {"$group": {
-            "_id": "$_id",
-            "name": {"$first": "$name"},
-            "description": {"$first": "$description"},
-            "system_message": {"$first": "$system_message"},
-            "is_public": {"$first": "$is_public"},
-            "enabled": {"$first": "$enabled"},
-            "contractor_id": {"$first": "$contractor_id"},
-            "tags": {"$push": "$tags"},
-            "ocps": {"$push": "$ocps"},
-            "functions": {"$first": "$functions"},
-            "tools": {"$push": "$tools"},
-            "contractors": {"$first": "$contractors"}
-        }}
+        },
+
+        # 🔹 Lookup Tools (via credential_type)
+        {
+            "$lookup": {
+                "from": "credential_type",
+                "let": {"tool_ids": "$tools.tool.id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$in": [{"$toString": "$_id"}, {"$ifNull": ["$$tool_ids", []]}]
+                            }
+                        }
+                    },
+                    {
+                        "$project": {
+                            "id": {"$toString": "$_id"},
+                            "name": 1,
+                            "kind": 1,
+                            "scope": "$scope",
+                        }
+                    }
+                ],
+                "as": "tools_info"
+            }
+        },
+
+        # 🔹 Monta os tools com detalhes
+        {
+            "$addFields": {
+                "tools": {
+                    "$map": {
+                        "input": {"$ifNull": ["$tools", []]},
+                        "as": "t",
+                        "in": {
+                            "tool": {
+                                "$arrayElemAt": [
+                                    {
+                                        "$filter": {
+                                            "input": "$tools_info",
+                                            "as": "ti",
+                                            "cond": {
+                                                "$eq": [
+                                                    "$$ti.id",
+                                                    {"$ifNull": ["$$t.tool.id", None]}
+                                                ]
+                                            }
+                                        }
+                                    },
+                                    0
+                                ]
+                            },
+                            "max": {"$ifNull": ["$$t.max", 1]},
+                            "required": {"$ifNull": ["$$t.required", False]}
+                        }
+                    }
+                }
+            }
+        },
+
+        # 🔹 Lookup Tags
+        {
+            "$lookup": {
+                "from": "tag",
+                "let": {"tag_ids": "$tags.id"},
+                "pipeline": [
+                    {
+                        "$match": {
+                            "$expr": {
+                                "$in": [{"$toString": "$_id"}, {"$ifNull": ["$$tag_ids", []]}]
+                            }
+                        }
+                    },
+                    {
+                        "$project": {
+                            "id": {"$toString": "$_id"},
+                            "name": 1
+                        }
+                    }
+                ],
+                "as": "tags"
+            }
+        },
+
+        # 🔹 Campos finais
+        {
+            "$project": {
+                "_id": {"$toString": "$_id"},
+                "name": 1,
+                "description": 1,
+                "system_message": 1,
+                "is_public": 1,
+                "enabled": 1,
+                "functions": 1,
+                "contractors": 1,
+                "contractor_id": 1,
+                "ocps": {
+                    "$map": {
+                        "input": "$ocps",
+                        "as": "o",
+                        "in": {
+                            "id": "$$o.id",
+                            "name": "$$o.name",
+                            "type": "$$o.type"
+                        }
+                    }
+                },
+                "tools": 1,
+                "tags": {
+                    "$map": {
+                        "input": "$tags",
+                        "as": "t",
+                        "in": {
+                            "id": "$$t.id",
+                            "name": "$$t.name"
+                        }
+                    }
+                }
+            }
+        }
     ]
 
     cursor = collection.aggregate(pipeline)
     docs = cursor.to_list(length=1)
     return docs[0] if docs else None
+
 
 def _extract_id(candidate, key_chain=("id", "_id")) -> str | None:
     """Extrai o id de um dict ou objeto (tentando 'id' e '_id')."""
@@ -102,14 +188,6 @@ def _extract_id(candidate, key_chain=("id", "_id")) -> str | None:
 
     return None
 
-
-def _to_object_id(id_str: str) -> ObjectId:
-    try:
-        return ObjectId(str(id_str))
-    except Exception:
-        raise BusinessDomainError("Id inválido (não é um ObjectId válido).")
-
-
 def validate_tools(db, tools: list[dict]):
     """
     Espera itens como:
@@ -119,7 +197,7 @@ def validate_tools(db, tools: list[dict]):
     Exemplo de uso:
       validate_tools(agent.tools, db)
     """
-    tool_collection = db["tool"]
+    credential_type_collection = db["credential_type"]
 
     for t in tools or []:
         tool_obj = getattr(t, "tool", None) or (t.get("tool") if isinstance(t, dict) else None) or t
@@ -127,16 +205,10 @@ def validate_tools(db, tools: list[dict]):
         if not tool_id:
             raise BusinessDomainError("Tool precisa ter um id válido.")
 
-        oid = _to_object_id(tool_id)
-        exists = tool_collection.find_one({"_id": oid}, {"_id": 1})
+        oid = ensure_object_id(tool_id)
+        exists = credential_type_collection.find_one({"_id": oid})
         if not exists:
             raise NotFoundError(f"Tool com id {tool_id} não existe.")
-
-
-from uuid import UUID
-from app.core.exceptions.types import BusinessDomainError, NotFoundError
-from bson import ObjectId
-
 
 def validate_ocps(db, contractor_id: UUID | None, ocps: list[dict]):
     """
@@ -167,7 +239,7 @@ def validate_ocps(db, contractor_id: UUID | None, ocps: list[dict]):
             raise BusinessDomainError(f"OCP duplicado detectado: {ocp_id}")
         ocp_ids_seen.add(ocp_id)
 
-        oid = _to_object_id(ocp_id)
+        oid = ensure_object_id(ocp_id)
 
         # Verifica existência e relação com contractor_id
         query = {"_id": oid}

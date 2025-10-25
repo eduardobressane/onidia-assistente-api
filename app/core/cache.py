@@ -7,6 +7,7 @@ from redis import Redis
 from redis.connection import BlockingConnectionPool
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from app.core.logger_config import debug, error
 
 load_dotenv()
 
@@ -36,7 +37,7 @@ def cache_get_json(key: str, model_cls: Optional[Type[BaseModel]] = None) -> Opt
             return model_cls(**data)
         return data
     except Exception as e:
-        print(f"[CACHE ERROR] Falha ao recuperar {key}: {e}")
+        error(f"[CACHE ERROR] Falha ao recuperar {key}: {e}")
         return None
 
 
@@ -48,14 +49,14 @@ def cache_set_json(key: str, value: Any, ttl_seconds: int = 0) -> None:
         else:
             _redis.set(key, payload)
     except Exception as e:
-        print(f"[CACHE ERROR] Falha ao salvar {key}: {e}")
+        error(f"[CACHE ERROR] Falha ao salvar {key}: {e}")
 
 
 def cache_delete(key: str) -> None:
     try:
         _redis.delete(key)
     except Exception as e:
-        print(f"[CACHE ERROR] Falha ao deletar {key}: {e}")
+        error(f"[CACHE ERROR] Falha ao deletar {key}: {e}")
 
 
 def cache_ping() -> bool:
@@ -63,3 +64,9 @@ def cache_ping() -> bool:
         return _redis.ping()
     except Exception:
         return False
+
+def cache_delete_prefix(prefix: str):
+    keys = _redis.keys(f"{prefix}*")
+    if keys:
+        _redis.delete(*keys)
+        debug(f"[CACHE DELETE PREFIX] {prefix} ({len(keys)} keys)")

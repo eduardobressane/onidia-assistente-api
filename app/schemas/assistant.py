@@ -5,7 +5,7 @@ from app.core.exceptions.types import NotFoundError
 from bson import ObjectId
 
 class Function(BaseModel):
-    codigo: Optional[str] = None
+    code: Optional[str] = None
     name: Optional[str] = None
     description: Optional[str] = None
 
@@ -18,9 +18,9 @@ class FunctionAssistant(BaseModel):
     system_message_compl: Optional[str] = None
     profiles: Optional[List[Profile]] = None
 
-class Credential(BaseModel):
+class AiModel(BaseModel):
     id: str
-    description: Optional[str] = None
+    name: Optional[str] = None
 
 class ToolInfo(BaseModel):
     id: str
@@ -33,9 +33,9 @@ class Tool(BaseModel):
 class Agent(BaseModel):
     id: str
     name: Optional[str] = None
+    description: Optional[str] = None
     system_message: Optional[str] = None
-    visivel: Optional[bool] = True
-    publico: Optional[bool] = True
+    is_public: Optional[bool] = True
     enabled: bool = Field(default=True)
     contractor_id: Optional[str] = None
 
@@ -45,7 +45,7 @@ class AgentAssistant(BaseModel):
     system_message_compl: str = Field(...)
     secret: Optional[bool] = True
     enabled: Optional[bool] = True
-    credential: Optional[Credential] = None
+    ai_model: Optional[AiModel] = None
     profiles: Optional[List[Profile]] = None
     functions: Optional[List[FunctionAssistant]] = None
     tools: List[Tool] = []
@@ -56,7 +56,7 @@ class AssistantBase(BaseModel):
     enabled: bool = Field(default=True)
 
 #CREATE/UPDATE
-class CredentialCreateOrUpdate(BaseModel):
+class AiModelCreateOrUpdate(BaseModel):
     id: str
 
 class ProfileCreateOrUpdate(BaseModel):
@@ -66,7 +66,7 @@ class AgentCreateOrUpdate(BaseModel):
     id: str
 
 class FunctionCreateOrUpdate(BaseModel):
-    codigo: str
+    code: str
 
 class FunctionAssistantCreateOrUpdate(BaseModel):
     function: FunctionCreateOrUpdate
@@ -93,19 +93,19 @@ class AgentAssistantCreateOrUpdate(BaseModel):
     system_message_compl: Optional[str] = None
     secret: bool = Field(default=True)
     enabled: bool = Field(default=True)
-    credential: CredentialCreateOrUpdate
+    ai_model: AiModelCreateOrUpdate
     profiles: Optional[List[ProfileCreateOrUpdate]] = None
     functions: Optional[List[FunctionAssistantCreateOrUpdate]] = None
     tools: Optional[List[ToolCreateOrUpdate]] = None
 
 class AssistantCreate(AssistantBase):
     system_message: str = Field(..., title="System Message")
-    credential: CredentialCreateOrUpdate
+    ai_model: AiModelCreateOrUpdate
     profiles: Optional[List[ProfileCreateOrUpdate]] = None
     agents: Optional[List[AgentAssistantCreateOrUpdate]] = None
 
 class AssistantUpdate(AssistantBase):
-    credential: CredentialCreateOrUpdate
+    ai_model: AiModelCreateOrUpdate
     profiles: Optional[List[ProfileCreateOrUpdate]] = None
     agents: Optional[List[AgentAssistantCreateOrUpdate]] = None
 
@@ -131,7 +131,7 @@ class AssistantOutDetail(BaseModel):
     description: str
     system_message: str
     enabled: bool
-    credential: Optional[Credential]
+    ai_model: Optional[AiModel]
     profiles: Optional[List[Profile]] = None
     agents: Optional[List[AgentAssistant]] = None
 
@@ -139,7 +139,7 @@ class AssistantOutDetail(BaseModel):
     def from_raw(cls, doc: dict) -> Optional["AssistantOutDetail"]:
         if not doc:
             return None
-
+        
         agents = []
         for a in doc.get("agents", []):
             if "agent" in a:
@@ -150,10 +150,10 @@ class AssistantOutDetail(BaseModel):
                             id=str(agent_data.get("id")),
                             name=agent_data.get("name"),
                             description=agent_data.get("description"),
-                            #system_message=agent_data.get("system_message"),
-                            #visivel=agent_data.get("visivel"),
+                            system_message=agent_data.get("system_message"),
+                            id_public=agent_data.get("id_public"),
                             enabled=agent_data.get("enabled"),
-                            #contractor_id=agent_data.get("contractor_id"),
+                            contractor_id=agent_data.get("contractor_id"),
                         ),
                         name=a.get("name"),
                         system_message_compl=a.get("system_message_compl"),
@@ -171,7 +171,7 @@ class AssistantOutDetail(BaseModel):
             description=doc.get("description"),
             system_message=doc.get("system_message"),
             enabled=doc.get("enabled"),
-            credential=doc.get("credential"),
+            ai_model=doc.get("ai_model"),
             profiles=doc.get("profiles"),
             agents=agents
         )
@@ -182,7 +182,7 @@ class AssistantOutInternal(BaseModel):
     description: str
     system_message: str
     enabled: bool
-    credential: Optional[Credential]
+    ai_model: Optional[AiModel]
     profiles: Optional[List[Profile]] = None
     agents: Optional[List[AgentAssistant]] = None
 
@@ -190,7 +190,7 @@ class AssistantOutInternal(BaseModel):
     def from_raw(cls, doc: dict) -> Optional["AssistantOutInternal"]:
         if not doc:
             return None
-
+        print(doc)
         agents = []
         for a in doc.get("agents", []):
             if "agent" in a:
@@ -202,10 +202,10 @@ class AssistantOutInternal(BaseModel):
                             id=str(agent_data.get("id")),
                             name=agent_data.get("name"),
                             description=agent_data.get("description"),
-                            #system_message=agent_data.get("system_message"),
-                            #visivel=agent_data.get("visivel"),
+                            system_message=agent_data.get("system_message"),
+                            id_public=agent_data.get("id_public"),
                             enabled=agent_data.get("enabled"),
-                            #contractor_id=agent_data.get("contractor_id"),
+                            contractor_id=agent_data.get("contractor_id"),
                         ),
                         name=a.get("name"),
                         system_message_compl=a.get("system_message_compl"),
@@ -223,7 +223,7 @@ class AssistantOutInternal(BaseModel):
             description=doc.get("description"),
             system_message=doc.get("system_message"),
             enabled=doc.get("enabled"),
-            credential=doc.get("credential"),
+            ai_model=doc.get("ai_model"),
             profiles=doc.get("profiles"),
             agents=agents
         )
