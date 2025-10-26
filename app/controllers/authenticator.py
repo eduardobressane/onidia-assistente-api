@@ -107,4 +107,4 @@ def execute(id: str):
     - Retorna a resposta já processada conforme o response_map configurado.
     """
     result = AuthenticatorService.execute(id)
-    return ok(data=result)
+    return ok(data=result, message="Serviço executado com sucesso!")

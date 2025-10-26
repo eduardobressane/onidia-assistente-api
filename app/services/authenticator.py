@@ -184,7 +184,7 @@ class AuthenticatorService:
             # ====== RETORNO FINAL ======
             return {
                 "success": True,
-                "status_code": response.status_code,
+                "status": response.status_code,
                 "response": mapped if any(mapped.values()) else resp_json,
             }
 

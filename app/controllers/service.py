@@ -92,3 +92,17 @@ def delete(id: str):
     """
     ServiceService.delete(id)
     return deleted()
+
+@router.post(
+    "/{id}/execute",
+    response_model=HttpResponse[dict],
+    dependencies=[Depends(require_permissions(["*", "srv_execute"]))],
+)
+def execute(id: str):
+    """
+    Executa o Service configurado.
+    - Se tiver authenticator_id, ele será executado antes e seus valores serão aplicados.
+    - Caso contrário, o service será executado diretamente.
+    """
+    result = ServiceService.execute(id)
+    return ok(data=result)

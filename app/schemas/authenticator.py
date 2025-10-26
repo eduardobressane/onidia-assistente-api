@@ -48,7 +48,7 @@ class ResponseMapModel(BaseModel):
 class AuthenticatorBase(BaseModel):
     name: str = Field(..., max_length=150)
     url: str
-    method: str
+    method: str = Field(..., pattern="^(GET|POST|PUT|DELETE|PATCH)$")
     body: Optional[Dict[str, Any]] = Field(default_factory=dict)
     headers: List[HeaderModel] = Field(default_factory=list)
     response_map: Optional[ResponseMapModel] = None
