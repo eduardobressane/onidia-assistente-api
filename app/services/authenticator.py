@@ -1,6 +1,7 @@
 from uuid import UUID
 import math
 from pymongo.errors import DuplicateKeyError
+import requests
 from app.dataprovider.mongo.models.authenticator import collection as auth_coll
 from app.schemas.authenticator import (
     AuthenticatorCreate,
@@ -8,7 +9,7 @@ from app.schemas.authenticator import (
     AuthenticatorOutList,
     AuthenticatorOutDetail,
 )
-from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError
+from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError, BadRequestError
 from app.core.utils.mongo import ensure_object_id
 
 
@@ -105,3 +106,96 @@ class AuthenticatorService:
             raise NotFoundError("Authenticator não encontrado")
 
         return True
+
+    # ========= EXECUTE =========
+    @staticmethod
+    def execute(id: str) -> dict:
+        """
+        Executa o authenticator: realiza a chamada HTTP configurada e retorna a resposta mapeada.
+        É resiliente a respostas aninhadas ou desconhecidas.
+        """
+
+        doc = auth_coll.find_one({"_id": ensure_object_id(id)})
+        if not doc:
+            raise NotFoundError("Authenticator não encontrado")
+
+        url = doc.get("url")
+        method = doc.get("method", "GET").upper()
+        headers = {h["name"]: h["value"] for h in doc.get("headers", [])}
+        body = doc.get("body", {})
+        response_map = doc.get("response_map", {})
+
+        try:
+            # ====== EXECUTA A REQUISIÇÃO ======
+            response = requests.request(
+                method=method,
+                url=url,
+                headers=headers,
+                json=body if body else None,
+                timeout=15
+            )
+
+            response.raise_for_status()
+
+            # ====== TENTA LER COMO JSON ======
+            try:
+                resp_json = response.json()
+            except Exception:
+                resp_json = {"raw": response.text}
+
+            # ====== FUNÇÃO AUXILIAR PARA PEGAR VALOR POR CAMINHO ======
+            def get_value_by_path(source, path: str):
+                """
+                Caminho do tipo: "data.token" ou "items[0].id"
+                Retorna None se qualquer parte do caminho não existir.
+                """
+                import re
+                value = source
+                parts = re.split(r'\.(?![^\[]*\])', path)  # divide em '.' mas respeita índices com colchetes
+
+                for part in parts:
+                    # Caso tenha índice de lista, exemplo: items[0]
+                    match = re.match(r'([^\[]+)\[(\d+)\]', part)
+                    if match:
+                        key, index = match.groups()
+                        value = value.get(key) if isinstance(value, dict) else None
+                        if isinstance(value, list):
+                            idx = int(index)
+                            value = value[idx] if idx < len(value) else None
+                        else:
+                            return None
+                    else:
+                        value = value.get(part) if isinstance(value, dict) else None
+
+                    if value is None:
+                        return None
+                return value
+
+            # ====== MAPEIA A RESPOSTA ======
+            mapped = {}
+            if response_map:
+                for key, path in response_map.items():
+                    if path and path.startswith("$response."):
+                        field_path = path.replace("$response.", "")
+                        mapped[key] = get_value_by_path(resp_json, field_path)
+                    else:
+                        mapped[key] = None
+
+            # ====== RETORNO FINAL ======
+            return {
+                "success": True,
+                "status_code": response.status_code,
+                "response": mapped if any(mapped.values()) else resp_json,
+            }
+
+        except requests.exceptions.Timeout:
+            raise BadRequestError("Timeout ao executar o authenticator")
+
+        except requests.exceptions.ConnectionError:
+            raise BadRequestError("Falha de conexão ao executar o authenticator")
+
+        except requests.exceptions.HTTPError as e:
+            raise BadRequestError(f"Erro HTTP {e.response.status_code}: {e.response.text}")
+
+        except Exception as e:
+            raise BadRequestError(f"Erro ao executar authenticator: {str(e)}")

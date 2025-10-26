@@ -211,6 +211,7 @@ class AssistantOutInternal(BaseModel):
                         system_message_compl=a.get("system_message_compl"),
                         secret=a.get("secret"),
                         enabled=a.get("enabled"),
+                        ai_model=a.get("ai_model"),
                         profiles=a.get("profiles"),
                         functions=a.get("functions"),
                         tools=a.get("tools"),

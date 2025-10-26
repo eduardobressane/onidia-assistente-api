@@ -19,11 +19,10 @@ collection.create_index(
 )
 
 def get_assistant_detail(id: str):
-    # === 1️⃣ Busca a assistente e resolve o ai_model principal + agentes ===
     pipeline = [
         {"$match": {"_id": ObjectId(id)}},
 
-        # --- Lookup do ai_model da assistente ---
+        # === Enriquecer ai_model da assistente ===
         {
             "$lookup": {
                 "from": "credential",
@@ -31,9 +30,7 @@ def get_assistant_detail(id: str):
                 "pipeline": [
                     {
                         "$match": {
-                            "$expr": {
-                                "$eq": [{"$toString": "$_id"}, "$$cred_id"]
-                            }
+                            "$expr": {"$eq": [{"$toString": "$_id"}, "$$cred_id"]}
                         }
                     },
                     {"$project": {"_id": 1, "name": "$description"}}
@@ -62,7 +59,7 @@ def get_assistant_detail(id: str):
         },
         {"$project": {"ai_model_doc": 0}},
 
-        # --- Lookup dos agentes (cruza agents.agent.id ↔ agent._id) ---
+        # === Lookup dos agentes ===
         {
             "$lookup": {
                 "from": "agent",
@@ -70,9 +67,7 @@ def get_assistant_detail(id: str):
                 "pipeline": [
                     {
                         "$match": {
-                            "$expr": {
-                                "$in": [{"$toString": "$_id"}, "$$agent_ids"]
-                            }
+                            "$expr": {"$in": [{"$toString": "$_id"}, "$$agent_ids"]}
                         }
                     },
                     {
@@ -92,7 +87,7 @@ def get_assistant_detail(id: str):
             }
         },
 
-        # --- Mescla os dados dos agentes, PRESERVANDO o ai_model original ---
+        # === Adicionar detalhes dos agentes ===
         {
             "$addFields": {
                 "agents": {
@@ -122,7 +117,7 @@ def get_assistant_detail(id: str):
                                 },
                                 "in": {
                                     "$mergeObjects": [
-                                        "$$ag",  # mantém todos os campos originais do agente, incluindo ai_model
+                                        "$$ag",
                                         {
                                             "agent": {
                                                 "id": "$$ag.agent.id",
@@ -153,30 +148,36 @@ def get_assistant_detail(id: str):
 
     assistant = docs[0]
 
-    # === 2️⃣ Enriquecimento em Python ===
+    # === Enriquecimento em Python ===
 
-    # 🔹 Enriquecer ai_model dos agentes (usando assistant.agents.ai_model.id)
-    model_ids = [
-        a["ai_model"]["id"]
-        for a in assistant["agents"]
-        if a.get("ai_model") and a["ai_model"].get("id")
-    ]
-    print(model_ids)
+    # 1️⃣ Enriquecer ai_model dos agentes (igual ao da assistente)
+    model_ids = []
+
+    for ag in assistant["agents"]:
+        ai_model = ag.get("ai_model")
+        if ai_model and ai_model.get("id"):
+            model_ids.append(str(ai_model["id"]))  # converte aqui
+
+    model_ids = list({mid for mid in model_ids if mid})
+
     if model_ids:
         creds = {
-            str(c["_id"]): c["description"]
+            str(c["_id"]): c.get("description")
             for c in credential_collection.find(
                 {"_id": {"$in": [ObjectId(x) for x in model_ids]}}
             )
         }
+
         for ag in assistant["agents"]:
-            if ag.get("ai_model") and ag["ai_model"].get("id"):
+            ai_model = ag.get("ai_model")
+            if ai_model and ai_model.get("id"):
+                model_id = str(ai_model["id"])
                 ag["ai_model"] = {
-                    "id": ag["ai_model"]["id"],
-                    "name": creds.get(ag["ai_model"]["id"]),
+                    "id": model_id,
+                    "name": creds.get(model_id)
                 }
 
-    # 🔹 Enriquecer funções (usando agent.functions.code)
+    # 2️⃣ Enriquecer funções (usando agent.functions.code)
     for ag in assistant["agents"]:
         func_map = {f["code"]: f for f in ag.get("functions_full", []) or []}
         for f in ag.get("functions", []):
@@ -186,7 +187,7 @@ def get_assistant_detail(id: str):
                 f["function"]["description"] = func_map[code].get("description")
         ag.pop("functions_full", None)
 
-    # 🔹 Enriquecer tools (usando credential_type)
+    # 3️⃣ Enriquecer tools (usando credential_type)
     tool_ids = list(
         {t["tool"]["id"] for ag in assistant["agents"] for t in ag.get("tools", [])}
     )

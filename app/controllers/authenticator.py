@@ -92,3 +92,19 @@ def delete(id: str):
     """
     AuthenticatorService.delete(id)
     return deleted()
+
+@router.post(
+    "/{id}/execute",
+    response_model=HttpResponse[dict],
+    dependencies=[Depends(require_permissions(["*", "hcdg7execau"]))],
+)
+def execute(id: str):
+    """
+    Executa o Authenticator (realiza a requisição HTTP configurada) e retorna o resultado da execução.
+
+    - Obtém os dados do authenticator cadastrado no banco.
+    - Monta e executa a chamada HTTP (url, método, headers, body).
+    - Retorna a resposta já processada conforme o response_map configurado.
+    """
+    result = AuthenticatorService.execute(id)
+    return ok(data=result)

@@ -77,6 +77,8 @@ class AssistantService:
                 agent_config = agent_coll.find_one({"_id": agent_id})
                 if not agent_config:
                     raise NotFoundError(f"Agente {agent_id} não encontrado.")
+
+                validate_ai_model(agent_payload.ai_model.id)
                 validate_tools(agent_config, agent_payload.model_dump())
 
             result = assistant_coll.insert_one(to_insert)
@@ -96,6 +98,8 @@ class AssistantService:
             agent_config = agent_coll.find_one({"_id": agent_id})
             if not agent_config:
                 raise NotFoundError(f"Agente {agent_id} não encontrado.")
+
+            validate_ai_model(agent_payload.ai_model.id)
             validate_tools(agent_config, agent_payload.model_dump())
 
         try:
