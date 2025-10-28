@@ -1,7 +1,7 @@
 from typing import Any, Dict, List, Optional, Literal
 from pydantic import BaseModel, Field, field_validator
 
-OCPType = Literal["mcp", "langserve"]
+OCPType = Literal["mcp", "ocp-m", "langserve"]
 
 class SourceModel(BaseModel):
     id: Optional[str] = None

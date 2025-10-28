@@ -118,13 +118,29 @@ class AuthenticatorOutDetail(AuthenticatorBase):
         import copy
         data = copy.deepcopy(doc)
 
-        # Oculta segredos sensíveis no body (ex: client_secret)
+        # Oculta valores do body
         try:
             if "body" in data and isinstance(data["body"], dict):
                 masked_body = {}
                 for k, v in data["body"].items():
-                    masked_body[k] = "****" if "secret" in k.lower() or "token" in k.lower() else v
+                    masked_body[k] = "****"
                 data["body"] = masked_body
+        except Exception:
+            pass
+
+        # Oculta valores dos headers
+        try:
+            if "headers" in data and isinstance(data["headers"], list):
+                masked_headers = []
+                for h in data["headers"]:
+                    if isinstance(h, dict):
+                        masked_headers.append({
+                            "name": h.get("name"),
+                            "value": "****" if "value" in h else None
+                        })
+                    else:
+                        masked_headers.append(h)
+                data["headers"] = masked_headers
         except Exception:
             pass
 

@@ -4,17 +4,21 @@ from pydantic import BaseModel, Field, field_validator
 
 # ======== MODELOS INTERNOS ========
 
+class ServiceModel(BaseModel):
+    id: str
+    name: str
+    description: Optional[str]
+
 class ToolModel(BaseModel):
-    name: str = Field(..., description="Nome interno da tool")
-    description: Optional[str] = Field(None, description="Descrição da função da tool")
-    service_id: Optional[str] = Field(None, description="ID do service associado")
+    name: str = Field(..., description="Internal name of the tool")
+    description: Optional[str] = Field(None, description="Description of the tool's function")
+    service: ServiceModel = Field(None, description="Associated service")
 
 
 # ======== MODELOS BASE ========
 
 class OCPMBase(BaseModel):
     name: str = Field(..., max_length=150)
-    path: str = Field(..., description="Rota pública do MCP")
     description: Optional[str] = None
     tools: List[ToolModel] = Field(default_factory=list)
 
@@ -29,13 +33,24 @@ class OCPMBase(BaseModel):
 
 
 # ======== CREATE / UPDATE ========
+class ServiceModelCreateOrUpdate(BaseModel):
+    id: str
+
+class ToolModelCreateOrUpdate(BaseModel):
+    name: str = Field(..., description="Internal name of the tool")
+    description: Optional[str] = Field(None, description="Description of the tool's function")
+    service: ServiceModelCreateOrUpdate = Field(None, description="Associated service")
 
 class OCPMCreate(OCPMBase):
-    pass
+    name: str = Field(..., max_length=150)
+    description: Optional[str] = None
+    tools: List[ToolModelCreateOrUpdate] = Field(default_factory=list)
 
 
 class OCPMUpdate(OCPMBase):
-    pass
+    name: str = Field(..., max_length=150)
+    description: Optional[str] = None
+    tools: List[ToolModelCreateOrUpdate] = Field(default_factory=list)
 
 
 # ======== OUTPUT LIST ========
@@ -43,7 +58,6 @@ class OCPMUpdate(OCPMBase):
 class OCPMOutList(BaseModel):
     id: str
     name: str
-    path: str
     description: Optional[str] = None
 
     @classmethod
@@ -53,7 +67,6 @@ class OCPMOutList(BaseModel):
         return cls(
             id=str(doc.get("_id")),
             name=doc.get("name"),
-            path=doc.get("path"),
             description=doc.get("description"),
         )
 
@@ -74,7 +87,6 @@ class OCPMOutDetail(OCPMBase):
         return cls(
             id=str(data.get("_id")),
             name=data.get("name"),
-            path=data.get("path"),
             description=data.get("description"),
             tools=data.get("tools", []),
         )

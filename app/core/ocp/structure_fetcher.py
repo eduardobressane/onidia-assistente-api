@@ -10,7 +10,7 @@ class StructureFetcher:
 
     @staticmethod
     def get_structure(
-        structure_type: Literal["mcp", "langserve"],
+        structure_type: Literal["mcp", "ocp-m", "langserve"],
         url: str,
         headers: Optional[Dict[str, str]] = None,
     ) -> Dict:
@@ -32,6 +32,8 @@ class StructureFetcher:
         try:
             if structure_type == "mcp":
                 return StructureFetcher._get_mcp_structure(url, merged_headers)
+            elif structure_type == "ocp-m":
+                return StructureFetcher._get_ocpm_structure(url, merged_headers)
             elif structure_type == "langserve":
                 return StructureFetcher._get_langserve_structure(url, merged_headers)
             else:
@@ -74,6 +76,30 @@ class StructureFetcher:
             raise BadRequestError("A resposta do MCP não está em formato JSON esperado.")
 
         return data
+
+    @staticmethod
+    def _get_ocpm_structure(url: str, headers: Optional[Dict[str, Any]] = None) -> Dict:
+        """
+        Obtém apenas o conteúdo do campo 'data' de um servidor dinâmico OCP-M.
+        Se a URL não terminar com '/tools', adiciona automaticamente.
+        """
+        url = url.rstrip("/")
+        if not url.endswith("/tools"):
+            url = f"{url}/tools"
+
+        response = requests.get(url, headers=headers or {}, timeout=10)
+        response.raise_for_status()
+
+        data = response.json()
+
+        if not isinstance(data, dict):
+            raise BadRequestError("A resposta do MCP não está em formato JSON esperado.")
+
+        # 🔹 Extrai apenas o campo 'data'
+        if "data" not in data:
+            raise BadRequestError("A resposta do MCP não contém o campo 'data'.")
+
+        return data["data"]
 
     @staticmethod
     def _get_langserve_structure(url: str, headers: Optional[Dict[str, Any]] = None) -> Dict:

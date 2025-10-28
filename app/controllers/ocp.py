@@ -17,7 +17,8 @@ router = APIRouter(prefix="/ocps", tags=["OCPs"])
 @router.get("", response_model=HttpResponse[List[OCPOutList]], dependencies=[Depends(require_permissions(["*", "hc9v6zj3sc"]))])
 def get_all(
     contractor_id: Optional[UUID] = Query(None), 
-    nome: Optional[str] = Query(None), current_user: dict = Depends(get_current_user),
+    nome: Optional[str] = Query(None),
+    current_user: dict = Depends(get_current_user),
     page: int = Query(1, ge=1, description="Número da página (inicia em 1)"),
     rpp: int = Query(10, ge=1, le=100, description="Registros por página"),
     ):

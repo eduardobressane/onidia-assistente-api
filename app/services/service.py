@@ -3,7 +3,10 @@ import math
 import re
 import requests
 from pymongo.errors import DuplicateKeyError
+from typing import Any, Dict
+from bson import ObjectId
 from app.dataprovider.mongo.models.service import collection as service_coll
+from app.dataprovider.mongo.models.authenticator import collection as auth_coll
 from app.schemas.service import (
     ServiceCreate,
     ServiceUpdate,
@@ -115,123 +118,147 @@ class ServiceService:
         return True
 
     @staticmethod
-    def execute(id: str, inputs: dict = None) -> dict:
+    def execute(id: str, inputs: dict | None = None) -> dict:
         """
         Executa um Service configurado.
-        - Lê o input_schema para validar e preencher variáveis (ex: {cnpj} ou :cnpj na URL).
-        - Se houver authenticator_id, executa o Authenticator antes
-          e injeta no header os valores retornados do response_map.
-        - Executa a requisição HTTP e retorna a resposta.
+        - Busca o service no banco
+        - Executa o Authenticator (se existir)
+        - Lê o response_map do Authenticator e aplica nos headers
+        - Interpreta o input_schema (path, body, query)
+        - Executa a requisição final e retorna o resultado
         """
-        # ====== BUSCA O SERVICE NO BANCO ======
-        doc = service_coll.find_one({"_id": ensure_object_id(id)})
-        if not doc:
-            raise NotFoundError("Service não encontrado")
-
-        url = doc.get("url")
-        method = doc.get("method", "GET").upper()
-        headers = {h["name"]: h["value"] for h in doc.get("headers", [])}
-        body = doc.get("body", {})
-        response_map = doc.get("response_map", {})
-        authenticator_id = doc.get("authenticator_id")
-        input_schema = doc.get("input_schema", {})
-        inputs = inputs or {}
-
-        # ====== VALIDA INPUT_SCHEMA ======
-        required = input_schema.get("required", [])
-        props = input_schema.get("properties", {})
-
-        # Valida obrigatórios
-        missing = [field for field in required if field not in inputs]
-        if missing:
-            raise BadRequestError(f"Campos obrigatórios ausentes: {', '.join(missing)}")
-
-        # Valida pattern e tipo básico
-        for key, meta in props.items():
-            if key not in inputs:
-                continue
-            value = inputs[key]
-            if meta.get("type") == "string" and not isinstance(value, str):
-                raise BadRequestError(f"O campo '{key}' deve ser string.")
-            if pattern := meta.get("pattern"):
-                if not re.match(pattern, str(value)):
-                    raise BadRequestError(f"O campo '{key}' não segue o padrão esperado.")
-
-        # ====== SUBSTITUI VARIÁVEIS NA URL ======
-        for key, val in inputs.items():
-            # Aceita {cnpj} ou :cnpj
-            url = url.replace(f"{{{key}}}", str(val)).replace(f":{key}", str(val))
-
-        # ====== ETAPA OPCIONAL: EXECUTA AUTHENTICATOR ======
-        def get_value_by_path(source, path: str):
-            """Navega em estruturas aninhadas tipo $.data.token"""
-            value = source
-            if not path or not isinstance(path, str):
-                return None
-            if path.startswith("$."):
-                path = path[2:]
-
-            parts = re.split(r'\.(?![^\[]*\])', path)
-            for part in parts:
-                match = re.match(r'([^\[]+)\[(\d+)\]', part)
-                if match:
-                    key, index = match.groups()
-                    value = value.get(key) if isinstance(value, dict) else None
-                    if isinstance(value, list):
-                        idx = int(index)
-                        value = value[idx] if idx < len(value) else None
-                    else:
-                        return None
-                else:
-                    value = value.get(part) if isinstance(value, dict) else None
-                if value is None:
-                    return None
-            return value
-
-        if authenticator_id:
-            try:
-                auth_result = AuthenticatorService.execute(str(authenticator_id))
-                auth_response = auth_result.get("response", {})
-            except Exception as e:
-                raise BadRequestError(f"Falha ao executar authenticator: {str(e)}")
-
-            for key, path in (response_map or {}).items():
-                if isinstance(path, str) and path.startswith("$."):
-                    value = get_value_by_path(auth_response, path)
-                    if value is not None:
-                        headers[key] = str(value)
-
-        # ====== EXECUTA O SERVICE PRINCIPAL ======
         try:
-            response = requests.request(
-                method=method,
-                url=url,
-                headers=headers,
-                json=body if body else None,
-                timeout=15
-            )
+            # 1️⃣ Busca o documento do service
+            doc = service_coll.find_one({"_id": ObjectId(id)})
+            if not doc:
+                raise NotFoundError(f"Service com id={id} não encontrado")
 
-            response.raise_for_status()
+            url = doc.get("url")
+            method = doc.get("method", "GET").upper()
+            headers = {h["name"]: h["value"] for h in doc.get("headers", [])}
+            body = doc.get("body", {}) or {}
+            authenticator_id = doc.get("authenticator_id")
 
+            # 2️⃣ Executa Authenticator se existir
+            if authenticator_id:
+                auth_doc = auth_coll.find_one({"_id": ObjectId(authenticator_id)})
+                if not auth_doc:
+                    raise NotFoundError(f"Authenticator com id={authenticator_id} não encontrado")
+
+                response_map = auth_doc.get("response_map", {}) or {}
+                try:
+                    auth_response = AuthenticatorService.execute(authenticator_id)
+                    ServiceService._inject_response_map_into_headers(
+                        headers, response_map, auth_response
+                    )
+                except Exception as e:
+                    raise BadRequestError(f"Falha ao executar authenticator: {str(e)}")
+
+            # 3️⃣ Monta a requisição conforme input_schema
+            if inputs:
+                url, body = ServiceService._apply_input_schema(
+                    doc.get("input_schema"), url, body, inputs
+                )
+
+            # 4️⃣ Executa requisição principal
             try:
-                resp_json = response.json()
-            except Exception:
-                resp_json = {"raw": response.text}
+                response = requests.request(method, url, headers=headers, json=body if body else None)
+                response.raise_for_status()
+                try:
+                    return response.json()
+                except ValueError:
+                    return {"status": "success", "text": response.text}
 
-            return {
-                "success": True,
-                "status_code": response.status_code,
-                "response": resp_json,
-            }
+            except requests.HTTPError as e:
+                return {
+                    "status": "error",
+                    "message": f"Erro HTTP {e.response.status_code}: {e.response.reason}",
+                    "url": url,
+                    "method": method,
+                }
+            except requests.ConnectionError:
+                return {"status": "error", "message": f"Falha de conexão ao acessar {url}"}
+            except requests.Timeout:
+                return {"status": "error", "message": f"Timeout ao acessar {url}"}
+            except Exception as e:
+                return {"status": "error", "message": f"Erro inesperado: {str(e)}"}
 
-        except requests.exceptions.Timeout:
-            raise BadRequestError("Timeout ao executar o service")
-
-        except requests.exceptions.ConnectionError:
-            raise BadRequestError("Falha de conexão ao executar o service")
-
-        except requests.exceptions.HTTPError as e:
-            raise BadRequestError(f"Erro HTTP {e.response.status_code}: {e.response.text}")
-
+        except NotFoundError as e:
+            return {"status": "error", "message": str(e)}
+        except BadRequestError as e:
+            return {"status": "error", "message": str(e)}
         except Exception as e:
-            raise BadRequestError(f"Erro ao executar service: {str(e)}")
+            return {"status": "error", "message": f"Erro crítico na execução: {str(e)}"}
+
+    # ======================================================================
+    @staticmethod
+    def _inject_response_map_into_headers(headers: dict, response_map: dict, auth_response: dict):
+        """
+        Interpreta o response_map do Authenticator e injeta valores nos headers.
+        Exemplo:
+            response_map = { "Authorization": "Bearer $.token" }
+        """
+        
+        for header_name, expr in response_map.items():
+            final_value = expr
+            # Localiza tokens do tipo $.campo
+            matches = re.findall(r'\$\.[\w.]+', expr)
+            for match in matches:
+                value = ServiceService._resolve_jsonpath(auth_response, match)
+                if value is not None:
+                    final_value = final_value.replace(match, str(value))
+            headers[header_name] = final_value
+
+    # ======================================================================
+    @staticmethod
+    def _resolve_jsonpath(data: dict, path: str) -> Any:
+        """Resolve $.campo ou $.a.b.c dentro do JSON."""
+
+        path = path.replace("$.", "$.response.") #Ajuste para o retorno de authenticator
+        keys = path.strip("$.").split(".")
+        value = data
+        for key in keys:
+            if isinstance(value, dict):
+                value = value.get(key)
+            else:
+                return None
+
+        return value
+
+    # ======================================================================
+    @staticmethod
+    def _apply_input_schema(input_schema: dict, url: str, body: dict, inputs: dict):
+        """
+        Interpreta input_schema (padrão MCP/FastMCP) para preencher URL e body.
+        Suporta parâmetros de path nos formatos:
+        - :param
+        - {param}
+
+        Exemplo:
+            schema: { path: { cnpj: {...} } }
+            url: /api/cnpj/:cnpj ou /api/cnpj/{cnpj}
+            inputs: { path: { "cnpj": "12345678000199" } }
+        """
+        if not input_schema or not inputs:
+            return url, body
+
+        # 🔹 Path parameters
+        path_vars = inputs.get("path", {})
+        for k, v in path_vars.items():
+            # Substitui :param e {param}
+            url = re.sub(fr":{k}\b", str(v), url)
+            url = re.sub(fr"\{{{k}\}}", str(v), url)
+
+        # 🔹 Body parameters
+        body_vars = inputs.get("body", {})
+        if body_vars:
+            body = body_vars
+
+        # 🔹 Query parameters
+        query_vars = inputs.get("query", {})
+        if query_vars:
+            query_string = "&".join([f"{k}={v}" for k, v in query_vars.items()])
+            sep = "&" if "?" in url else "?"
+            url = f"{url}{sep}{query_string}"
+
+        return url, body

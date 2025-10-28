@@ -5,98 +5,50 @@ from pydantic import BaseModel, Field, field_validator
 # ======== MODELOS INTERNOS ========
 
 class HeaderModel(BaseModel):
-    name: str
-    value: str
+    name: str = Field(..., description="Nome do cabeçalho HTTP")
+    value: str = Field(..., description="Valor do cabeçalho HTTP")
 
 
 class SchemaProperty(BaseModel):
-    """
-    Representa um campo dentro do schema MCP (padrão JSON Schema).
-    Exemplo:
-    {
-        "type": "string",
-        "description": "CNPJ da empresa",
-        "pattern": "^[0-9]{14}$",
-        "example": "12345678000195"
-    }
-    """
-    type: str = Field(..., description="Tipo do campo (string, number, boolean, object...)")
-    description: Optional[str] = None
-    pattern: Optional[str] = None
-    example: Optional[Any] = None
-    enum: Optional[List[Any]] = None
-    format: Optional[str] = None
+    type: str = Field(..., description="Tipo do campo (ex: string, number, object, etc.)")
+    pattern: Optional[str] = Field(None, description="Expressão regular de validação, se aplicável")
 
 
-class SectionSchemaModel(BaseModel):
-    """
-    Representa uma seção de input do tipo path, query ou body.
-    """
-    type: str = Field(default="object", description="Tipo do schema (sempre 'object')")
+class InputSubSchema(BaseModel):
+    """Representa uma seção do schema (path, query ou body)"""
+    type: str = Field(..., description="Deve ser sempre 'object'")
     properties: Dict[str, SchemaProperty] = Field(default_factory=dict)
-    required: List[str] = Field(default_factory=list)
+    required: Optional[List[str]] = Field(default_factory=list)
 
 
 class InputSchemaModel(BaseModel):
-    """
-    Segue o padrão MCP:
-    {
-      "type": "object",
-      "properties": {
-        "path": { ... },
-        "query": { ... },
-        "body": { ... }
-      },
-      "required": ["path"]
-    }
-    """
-    type: str = Field(default="object", description="Tipo do schema (sempre 'object')")
-    properties: Dict[str, SectionSchemaModel] = Field(default_factory=dict)
-    required: List[str] = Field(default_factory=list)
+    """Schema completo de entrada conforme o padrão JSON Schema"""
+    type: str = Field(..., description="Deve ser sempre 'object'")
+    properties: Dict[str, InputSubSchema] = Field(
+        ..., description="Contém os blocos path, query e body"
+    )
+    required: Optional[List[str]] = Field(default_factory=list)
 
-    @field_validator("type")
+    @field_validator("properties", mode="before")
     @classmethod
-    def validate_type(cls, v):
-        if v not in ["object"]:
-            raise ValueError("input_schema.type deve ser 'object'")
+    def ensure_properties_dict(cls, v):
+        if not isinstance(v, dict):
+            raise ValueError("properties deve ser um objeto (dict)")
         return v
-
-
-class OutputSchemaModel(BaseModel):
-    """
-    Define o formato esperado da resposta do service (opcional).
-    Exemplo:
-    {
-      "type": "object",
-      "properties": {
-        "razao_social": {"type": "string"},
-        "situacao": {"type": "string"}
-      }
-    }
-    """
-    type: str = Field(default="object")
-    properties: Dict[str, SchemaProperty] = Field(default_factory=dict)
-    required: List[str] = Field(default_factory=list)
 
 
 # ======== MODELOS BASE ========
 
 class ServiceBase(BaseModel):
-    name: str = Field(..., max_length=150)
-    description: Optional[str] = None
-    url: str
-    method: str = Field(..., pattern="^(GET|POST|PUT|DELETE|PATCH)$")
-    headers: List[HeaderModel] = Field(default_factory=list)
-    authenticator_id: Optional[str] = Field(default=None, description="Referência ao authenticator")
+    name: str = Field(..., max_length=150, description="Nome do serviço")
+    description: Optional[str] = Field(None, description="Descrição do serviço")
+    url: str = Field(..., description="URL do endpoint externo")
+    method: str = Field(..., pattern="^(GET|POST|PUT|DELETE|PATCH)$", description="Método HTTP (GET, POST, etc.)")
+    headers: List[HeaderModel] = Field(default_factory=list, description="Cabeçalhos HTTP")
+    authenticator_id: Optional[str] = Field(None, description="ID do autenticador associado")
     input_schema: Optional[InputSchemaModel] = Field(
-        default=None, description="Schema MCP de entrada (path, query, body)"
-    )
-    output_schema: Optional[OutputSchemaModel] = Field(
-        default=None, description="Schema MCP opcional de saída"
-    )
-    content_type: Optional[str] = Field(
-        default="application/json",
-        description="Define o tipo de conteúdo do corpo da requisição (application/json, multipart/form-data, etc.)"
+        None,
+        description="Schema de entrada detalhado (path/query/body) ou null",
     )
 
     @field_validator("headers", mode="before")
@@ -124,9 +76,9 @@ class ServiceUpdate(ServiceBase):
 class ServiceOutList(BaseModel):
     id: str
     name: str
+    description: Optional[str] = None
     url: str
     method: str
-    authenticator_id: Optional[str] = None
 
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["ServiceOutList"]:
@@ -135,9 +87,9 @@ class ServiceOutList(BaseModel):
         return cls(
             id=str(doc.get("_id")),
             name=doc.get("name"),
+            description=doc.get("description"),
             url=doc.get("url"),
             method=doc.get("method"),
-            authenticator_id=doc.get("authenticator_id")
         )
 
 
@@ -154,6 +106,22 @@ class ServiceOutDetail(ServiceBase):
         import copy
         data = copy.deepcopy(doc)
 
+        # 🔹 Oculta valores dos headers
+        try:
+            if "headers" in data and isinstance(data["headers"], list):
+                masked_headers = []
+                for h in data["headers"]:
+                    if isinstance(h, dict):
+                        masked_headers.append({
+                            "name": h.get("name"),
+                            "value": "****" if "value" in h else None
+                        })
+                    else:
+                        masked_headers.append(h)
+                data["headers"] = masked_headers
+        except Exception:
+            pass
+
         return cls(
             id=str(data.get("_id")),
             name=data.get("name"),
@@ -163,6 +131,4 @@ class ServiceOutDetail(ServiceBase):
             headers=data.get("headers", []),
             authenticator_id=data.get("authenticator_id"),
             input_schema=data.get("input_schema"),
-            output_schema=data.get("output_schema"),
-            content_type=data.get("content_type", "application/json"),
         )

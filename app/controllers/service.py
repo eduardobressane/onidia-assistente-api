@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Body, Path
 from typing import List, Optional
 from uuid import UUID
 
@@ -10,7 +10,7 @@ from app.schemas.service import (
     ServiceOutDetail,
 )
 from app.schemas.http_response import HttpResponse
-from app.schemas.http_response_advice import ok, created, updated, deleted
+from app.schemas.http_response_advice import ok, created, updated, deleted, error
 from app.core.security import require_permissions, get_current_user, validate_and_alter_contractor
 
 router = APIRouter(prefix="/services", tags=["Services"])
@@ -98,11 +98,77 @@ def delete(id: str):
     response_model=HttpResponse[dict],
     dependencies=[Depends(require_permissions(["*", "srv_execute"]))],
 )
-def execute(id: str):
-    """
-    Executa o Service configurado.
-    - Se tiver authenticator_id, ele será executado antes e seus valores serão aplicados.
-    - Caso contrário, o service será executado diretamente.
-    """
-    result = ServiceService.execute(id)
-    return ok(data=result)
+def execute(
+    id: str = Path(..., description="ID do service a ser executado"),
+    inputs: Optional[dict] = Body(None, description="Dados conforme input_schema do service")
+):
+    try:
+        result = ServiceService.execute(id, inputs)
+        return ok(data=result)
+    except Exception as e:
+        return error(message=f"Erro ao executar service: {str(e)}")
+
+"""
+Exemplo JSON cadastro service
+
+{
+  "_id": "6710bfa9df002b9aafaa1234",
+  "name": "consulta_veiculo",
+  "description": "Consulta veículo por placa e envia dados para análise",
+  "url": "https://api.onidia.com/v1/consultas/{placa}/resultado",
+  "method": "POST",
+  "headers": [
+    { "name": "Content-Type", "value": "application/json" }
+  ],
+  "authenticator_id": "68fe21e6c0df1a9ffc6634ee",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "path": {
+        "type": "object",
+        "properties": {
+          "placa": { "type": "string" }
+        },
+        "required": ["placa"]
+      },
+      "body": {
+        "type": "object",
+        "properties": {
+          "cpf": { "type": "string" },
+          "cnpj": { "type": "string" }
+        }
+      },
+      "query": {
+        "type": "object",
+        "properties": {
+          "tipo": { "type": "string" },
+          "origem": { "type": "string" }
+        }
+      }
+    },
+    "required": ["path", "body", "query"]
+  }
+}
+
+Exemplo JSON execute service
+
+POST /services/6710bfa9df002b9aafaa1234/execute
+Content-Type: application/json
+Authorization: Bearer <jwt>
+
+Body:
+
+{
+  "path": {
+    "placa": "ABC1D23"
+  },
+  "body": {
+    "cpf": "12345678900",
+    "cnpj": "27865757000102"
+  },
+  "query": {
+    "tipo": "completo",
+    "origem": "crm"
+  }
+}
+"""

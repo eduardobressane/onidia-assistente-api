@@ -10,6 +10,8 @@ from app.schemas.ocpm import (
 )
 from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError
 from app.core.utils.mongo import ensure_object_id
+from app.dataprovider.mongo.models.ocpm import get_ocpm_detail, validate_service
+from app.dataprovider.mongo.base import db as mongo_db
 
 
 class OCPMService:
@@ -44,8 +46,7 @@ class OCPMService:
         """
         Busca um OCP-M pelo ID.
         """
-        oid = ensure_object_id(id)
-        doc = ocpm_coll.find_one({"_id": oid})
+        doc = get_ocpm_detail(id)
 
         if not doc:
             raise NotFoundError("OCP-M não encontrado")
@@ -62,6 +63,8 @@ class OCPMService:
             data = payload.model_dump()
             data["contractor_id"] = str(contractor_id)
 
+            validate_service(mongo_db, contractor_id, payload.tools.service.id)
+
             result = ocpm_coll.insert_one(data)
             created = ocpm_coll.find_one({"_id": result.inserted_id})
             return OCPMOutDetail.from_raw(created)
@@ -77,6 +80,8 @@ class OCPMService:
         """
         oid = ensure_object_id(id)
         data = payload.model_dump()
+
+        validate_service(mongo_db, None, payload.tools.service.id)
 
         try:
             updated = ocpm_coll.find_one_and_update(
