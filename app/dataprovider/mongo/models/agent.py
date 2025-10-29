@@ -98,7 +98,8 @@ def get_agent_detail(id: str):
                                     0
                                 ]
                             },
-                            "max": {"$ifNull": ["$$t.max", 1]},
+                            "code": {"$ifNull": ["$$t.code", None]},
+                            "name": {"$ifNull": ["$$t.name", 1]},
                             "required": {"$ifNull": ["$$t.required", False]}
                         }
                     }
@@ -191,7 +192,7 @@ def _extract_id(candidate, key_chain=("id", "_id")) -> str | None:
 def validate_tools(db, tools: list[dict]):
     """
     Espera itens como:
-      {"tool": {"id": "...", ...}, "max": 1, "required": True}
+      {"tool": {"id": "...", ...}, "name": "", "required": True}
     ou um objeto Pydantic com atributo .tool.id
 
     Exemplo de uso:

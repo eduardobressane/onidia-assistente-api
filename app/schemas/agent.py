@@ -28,7 +28,8 @@ class Tool(BaseModel):
 
 class ToolInfo(BaseModel):
     tool: Tool
-    max: int
+    code: str = Field(..., max_length=10)
+    name: str = Field(..., max_length=150)
     required: bool
 
 class AgentBase(BaseModel):
@@ -98,7 +99,8 @@ class ToolCreateOrUpdate(BaseModel):
 
 class ToolInfoCreateOrUpdate(BaseModel):
     tool: ToolCreateOrUpdate
-    max: int
+    code: str = Field(..., max_length=10)
+    name: str = Field(..., max_length=150)
     required: bool = Field(...)
 
 class AgentCreate(AgentBase):
@@ -145,7 +147,7 @@ class AgentOutDetail(AgentBase):
     def from_raw(cls, doc: dict) -> Optional["AgentOutDetail"]:
         if not doc:
             return None
-
+        
         tags = []
         for c in doc.get("tags", []):
             tags.append({
@@ -173,7 +175,8 @@ class AgentOutDetail(AgentBase):
                             name=tool_data.get("name"),
                             scope=tool_data.get("scope"),
                         ),
-                        max=t.get("max"),
+                        code=t.get("code"),
+                        name=t.get("name"),
                         required=t.get("required", False)
                     )
                 )
@@ -222,7 +225,7 @@ class AgentOutInternal(AgentBase):
     def from_raw(cls, doc: dict) -> Optional["AgentOutInternal"]:
         if not doc:
             return None
-
+        
         tags = []
         for c in doc.get("tags", []):
             tags.append({
@@ -250,7 +253,8 @@ class AgentOutInternal(AgentBase):
                             name=tool_data.get("name"),
                             scope=tool_data.get("scope"),
                         ),
-                        max=t.get("max"),
+                        code=t.get("code"),
+                        name=t.get("name"),
                         required=t.get("required", False)
                     )
                 )

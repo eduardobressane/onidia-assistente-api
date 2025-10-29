@@ -96,6 +96,8 @@ class OCPUpdate(BaseModel):
 #OUTPUT
 
 class OCPOutList(OCPBase):
+    type: str
+
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["OCPOutList"]:
         if not doc:
@@ -103,6 +105,7 @@ class OCPOutList(OCPBase):
         return cls(
             id=str(doc.get("_id")),
             name=doc.get("name"),
+            type=doc.get("ocp").get("metadata").get("source").get("type"),
             enabled=doc.get("enabled", True),
             ocp=doc.get("ocp")
         )

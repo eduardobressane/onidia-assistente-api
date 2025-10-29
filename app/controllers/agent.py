@@ -29,7 +29,7 @@ def get_all(
 @router.get("/{id}", response_model=AgentOutDetail, dependencies=[Depends(require_permissions(["*", "hafj0kaclm"]))])
 def get_by_id(id: str):
     agent: AgentOutInternal = AgentService.get_by_id(id)
-    
+
     return AgentOutDetail(**agent.dict())
 
 
