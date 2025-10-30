@@ -48,10 +48,10 @@ def delete(id: str):
 @router.post("/{id}/upload", dependencies=[Depends(require_permissions(["*", "hafioitpkt", "hafip1bfnc"]))])
 async def upload_image(id: str, file: UploadFile = File(...)):
     data = CredentialTypeService.upload_image(id, file)
-    return created(message="Imagem criada ou atualizada com sucesso!", data=data)
+    return created(message=" Upload realizado com sucesso!", data=data)
 
 
-@router.delete("/{id}/upload", dependencies=[Depends(require_permissions(["*", "hafioitpkt", "hafip1bfnc"]))])
+@router.delete("/{id}/upload", dependencies=[Depends(require_permissions(["*", "hafipau25p"]))])
 async def delete_image(id: str):
     data = CredentialTypeService.delete_image(id)
     return deleted(message="Imagem excluída com sucesso!", data=data)

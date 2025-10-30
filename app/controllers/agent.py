@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, UploadFile, File
 from typing import List, Optional
 from uuid import UUID
 
@@ -61,3 +61,14 @@ def delete(id: str, current_user: dict = Depends(get_current_user)):
 
     AgentService.delete(id)
     return deleted()
+
+@router.post("/{id}/upload", dependencies=[Depends(require_permissions(["*", "hafj0qu4kb", "hafj0vsur6"]))])
+async def upload_image(id: str, file: UploadFile = File(...)):
+    data = AgentService.upload_image(id, file)
+    return created(message="Upload realizado com sucesso!", data=data)
+
+
+@router.delete("/{id}/upload", dependencies=[Depends(require_permissions(["*", "hafj0zvbsy"]))])
+async def delete_image(id: str):
+    data = AgentService.delete_image(id)
+    return deleted(message="Imagem excluída com sucesso!", data=data)

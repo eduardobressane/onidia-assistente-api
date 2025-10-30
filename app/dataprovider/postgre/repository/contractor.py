@@ -35,25 +35,3 @@ def contractor_exists(db: Session, uuid: UUID) -> bool:
     
     # row é uma tupla, mas como só selecionamos "ativo", o valor está na posição 0
     return bool(row[0])
-
-def contractors_exists(db: Session, uuids: List[UUID]) -> bool:
-    if not uuids:
-        return True  # lista vazia não deve falhar
-
-    sql = text("""
-        SELECT uuid
-        FROM hub.contratante
-        WHERE uuid = ANY(:uuids)
-          AND ativo = true
-    """)
-
-    rows = db.execute(sql, {"uuids": [str(u) for u in uuids]}).fetchall()
-    encontrados = {str(r[0]) for r in rows}
-
-    enviados = {str(u) for u in uuids}
-    faltantes = enviados - encontrados
-
-    if faltantes:
-        raise NotFoundError(f"Contratante(s) não encontrado(s): {', '.join(faltantes)}")
-
-    return True

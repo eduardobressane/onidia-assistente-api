@@ -76,7 +76,6 @@ def get_assistant_detail(id: str):
                             "name": 1,
                             "description": 1,
                             "system_message": 1,
-                            "is_public": 1,
                             "enabled": 1,
                             "contractor_id": 1,
                             "functions": 1
@@ -124,7 +123,6 @@ def get_assistant_detail(id: str):
                                                 "name": "$$doc.name",
                                                 "description": "$$doc.description",
                                                 "system_message": "$$doc.system_message",
-                                                "is_public": "$$doc.is_public",
                                                 "enabled": "$$doc.enabled",
                                                 "contractor_id": "$$doc.contractor_id"
                                             },

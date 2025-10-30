@@ -1,9 +1,14 @@
+import os
+from dotenv import load_dotenv
+
 from typing import List, Optional, Any, Literal
 from uuid import UUID
 from pydantic import ConfigDict, BaseModel, Field, model_validator, field_validator
 from app.core.exceptions.types import NotFoundError, BadRequestError
 from bson import ObjectId
 import json
+
+URL_BASE_IMG_PUBLIC = os.getenv("URL_BASE_IMG_PUBLIC")
 
 class OCP(BaseModel):
     id: str = Field(...)
@@ -36,12 +41,10 @@ class AgentBase(BaseModel):
     name: str = Field(..., max_length=150)
     description: str = Field(..., max_length=2048)
     system_message: str = Field(...)
-    is_public: bool = Field(default=True)
     enabled: bool = Field(default=True)
     ocps: List[OCP]
     tags: List[Tag]
     functions: Optional[List[Function]] = None
-    contractors: Optional[List[str]] = None
 
     @model_validator(mode="after")
     def validate_functions_unique(self):
@@ -49,27 +52,6 @@ class AgentBase(BaseModel):
         codes = [f.code for f in functions]
         if len(codes) != len(set(codes)):
             raise BadRequestError("Os códigos das funções devem ser únicos dentro do agente.")
-        return self
-
-    @model_validator(mode="after")
-    def validate_contractors_unique_and_uuid(self):
-        contractors = self.contractors or []
-        if not contractors:
-            return self  # lista vazia = ok
-
-        standardized = []
-        for cid in contractors:
-            try:
-                # normaliza para UUID válido em lowercase
-                standardized.append(str(UUID(str(cid).strip())))
-            except ValueError:
-                raise BadRequestError(f"Contratante '{cid}' não é um UUID válido.")
-
-        if len(standardized) != len(set(standardized)):
-            raise BadRequestError("Os ids dos contratantes devem ser únicos dentro do agente.")
-
-        # sobrescreve padronizado
-        self.contractors = standardized
         return self
 
 #CREATE/UPDATE
@@ -118,10 +100,10 @@ class AgentOutList(BaseModel):
     id: str
     name: str
     description: str
-    is_public: bool
+    image: Optional[str]
     enabled: bool
 
-    model_config = ConfigDict(populate_by_name=True, exclude_none=False)
+    model_config = ConfigDict(populate_by_name=True)
 
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["AgentOutList"]:
@@ -132,16 +114,17 @@ class AgentOutList(BaseModel):
             id=str(doc["_id"]),
             name=doc.get("name"),
             description=doc.get("description"),
-            is_public=doc.get("is_public"),
+            image=f"{URL_BASE_IMG_PUBLIC}/agents/{doc.get('_id')}" if doc.get("has_image") else None,
             enabled=doc.get("enabled"),
         )
 
 class AgentOutDetail(AgentBase):
     id: str
     ocps: List[OCP]
+    image: Optional[str]
     tools: List[ToolInfo]
 
-    model_config = ConfigDict(populate_by_name=True, exclude_none=False)
+    model_config = ConfigDict(populate_by_name=True)
 
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["AgentOutDetail"]:
@@ -181,51 +164,33 @@ class AgentOutDetail(AgentBase):
                     )
                 )
 
-        # Normalizes contractors
-        raw_contractors = doc.get("contractors") or []
-        contractors: List[str] = []
-
-        if isinstance(raw_contractors, str):
-            try:
-                raw_contractors = json.loads(raw_contractors)
-            except Exception:
-                raw_contractors = []
-
-        if isinstance(raw_contractors, list):
-            for c in raw_contractors:
-                if isinstance(c, list):  # flatten lista de listas
-                    for item in c:
-                        if item:
-                            contractors.append(str(item))
-                elif c:
-                    contractors.append(str(c))
-
         return cls(
             id=str(doc["_id"]),
             name=doc.get("name"),
             description=doc.get("description"),
             system_message=doc.get("system_message"),
+            image=f"{URL_BASE_IMG_PUBLIC}/agents/{doc.get('_id')}" if doc.get("has_image") else None,
             enabled=doc.get("enabled"),
             tags=tags,
             ocps=ocps,
             functions=doc.get("functions"),
             tools=tools,
-            contractors=contractors,
         )
 
 class AgentOutInternal(AgentBase):
     id: str
+    image: Optional[str]
     contractor_id: Optional[str] = None
     ocps: List[OCP]
     tools: List[ToolInfo]
 
-    model_config = ConfigDict(populate_by_name=True, exclude_none=False)
+    model_config = ConfigDict(populate_by_name=True)
 
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["AgentOutInternal"]:
         if not doc:
             return None
-        
+
         tags = []
         for c in doc.get("tags", []):
             tags.append({
@@ -259,35 +224,16 @@ class AgentOutInternal(AgentBase):
                     )
                 )
 
-        # Normalizes contractors
-        raw_contractors = doc.get("contractors") or []
-        contractors: List[str] = []
-
-        if isinstance(raw_contractors, str):
-            try:
-                raw_contractors = json.loads(raw_contractors)
-            except Exception:
-                raw_contractors = []
-
-        if isinstance(raw_contractors, list):
-            for c in raw_contractors:
-                if isinstance(c, list):  # flatten lista de listas
-                    for item in c:
-                        if item:
-                            contractors.append(str(item))
-                elif c:
-                    contractors.append(str(c))
-
         return cls(
             id=str(doc["_id"]),
             name=doc.get("name"),
             description=doc.get("description"),
             system_message=doc.get("system_message"),
             contractor_id=doc.get("contractor_id"),
+            image=f"{URL_BASE_IMG_PUBLIC}/agents/{doc.get('_id')}" if doc.get("has_image") else None,
             enabled=doc.get("enabled"),
             tags=tags,
             ocps=ocps,
             functions=doc.get("functions"),
             tools=tools,
-            contractors=contractors,
         )

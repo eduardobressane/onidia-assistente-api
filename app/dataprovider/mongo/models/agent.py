@@ -138,10 +138,9 @@ def get_agent_detail(id: str):
                 "name": 1,
                 "description": 1,
                 "system_message": 1,
-                "is_public": 1,
+                "has_image": 1,
                 "enabled": 1,
                 "functions": 1,
-                "contractors": 1,
                 "contractor_id": 1,
                 "ocps": {
                     "$map": {

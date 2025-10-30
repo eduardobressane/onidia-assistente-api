@@ -10,17 +10,25 @@ from app.dataprovider.mongo.models.agent import get_agent_detail, validate_tools
 from app.schemas.agent import (
     AgentCreate, AgentUpdate, AgentOutList, AgentOutDetail, AgentOutInternal
 )
-from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError, BusinessDomainError
+from app.core.exceptions.types import NotFoundError, DuplicateKeyDomainError, BusinessDomainError, BadRequestError
 from app.core.utils.mongo import ensure_object_id
 from pymongo.errors import DuplicateKeyError
 
 from app.dataprovider.postgre.session import SessionLocal
 from app.dataprovider.mongo.base import db as mongo_db
-from app.dataprovider.postgre.repository.contractor import contractor_exists, contractors_exists
+from app.dataprovider.postgre.repository.contractor import contractor_exists
 from app.dataprovider.mongo.models.tag import validate_existing_tags
+from app.services.upload import UploadService
+from fastapi import UploadFile
+from app.schemas.http_response_advice import error
 
+import os
+from dotenv import load_dotenv
 
 class AgentService:
+
+    MAX_FILE_SIZE_KB = int(os.getenv("MAX_FILE_SIZE_KB_AGENT", 1024))
+    ALLOWED_CONTENT_TYPES = set(os.getenv("ALLOWED_CONTENT_TYPES_IMAGE").split(","))
 
     @staticmethod
     def get_all(contractor_id: UUID, name: str = None, page: int = 1, rpp: int = 10) -> dict:
@@ -53,13 +61,6 @@ class AgentService:
         if not doc:
             raise NotFoundError("Agente não encontrado")
 
-        # Remove de contratantes se for igual ao contractor_id
-        if "contractors" in doc and "contractor_id" in doc:
-            doc["contractors"] = [
-                c for c in doc["contractors"]
-                if str(c) != str(doc["contractor_id"])
-            ]
-
         return AgentOutInternal.from_raw(doc)
 
     @staticmethod
@@ -70,9 +71,7 @@ class AgentService:
 
             to_insert = payload.model_dump()
             to_insert["contractor_id"] = str(contractor_id)
-
-            with SessionLocal() as db:
-                contractors_exists(db, payload.contractors)
+            to_insert["has_image"] = False
 
             validate_ocps(mongo_db, contractor_id, payload.ocps)
             validate_tools(mongo_db, payload.tools)
@@ -90,9 +89,6 @@ class AgentService:
     def update(id: str, payload: AgentUpdate) -> AgentOutDetail:
         oid = ensure_object_id(id)
         data = payload.model_dump()
-
-        with SessionLocal() as db:
-            contractors_exists(db, payload.contractors)
 
         validate_ocps(mongo_db, None, payload.ocps)
         validate_tools(mongo_db, payload.tools)
@@ -125,3 +121,35 @@ class AgentService:
             raise NotFoundError("Agente não encontrado")
 
         return True
+
+    @staticmethod
+    def upload_image(id: str, file: UploadFile):
+        oid = ensure_object_id(id)
+        agent = agent_coll.find_one({"_id": oid})
+
+        if not agent:
+            raise NotFoundError("Agente não encontrado")
+
+        try:
+            result = UploadService.upload_file(id=id, dir='agents', file=file, max_file_size=AgentService.MAX_FILE_SIZE_KB, allowed_content_types=AgentService.ALLOWED_CONTENT_TYPES)
+            agent_coll.update_one({"_id": oid}, {"$set": {"has_image": True}})
+
+            return result
+        except Exception as e:
+            return error(status_code=400, message=f"Erro ao realizar o upload da imagem")
+
+    @staticmethod
+    def delete_image(id: str):
+        oid = ensure_object_id(id)
+        agent = agent_coll.find_one({"_id": oid})
+
+        if not agent:
+            raise NotFoundError("Agente não encontrado")
+
+        try:
+            result = UploadService.delete_file(id=id, dir='agents')
+            agent_coll.update_one({"_id": oid}, {"$set": {"has_image": False}})
+
+            return result
+        except Exception as e:
+            return error(status_code=400, message=f"Erro ao excluir imagem")

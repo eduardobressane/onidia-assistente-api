@@ -35,7 +35,6 @@ class Agent(BaseModel):
     name: Optional[str] = None
     description: Optional[str] = None
     system_message: Optional[str] = None
-    is_public: Optional[bool] = True
     enabled: bool = Field(default=True)
     contractor_id: Optional[str] = None
 
