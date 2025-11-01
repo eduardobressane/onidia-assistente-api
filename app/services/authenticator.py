@@ -108,25 +108,30 @@ class AuthenticatorService:
         return True
 
     # ========= EXECUTE =========
+    
     @staticmethod
     def execute(id: str) -> dict:
-        """
-        Executa o authenticator: realiza a chamada HTTP configurada e retorna a resposta mapeada.
-        É resiliente a respostas aninhadas ou desconhecidas.
-        """
-
         doc = auth_coll.find_one({"_id": ensure_object_id(id)})
         if not doc:
             raise NotFoundError("Authenticator não encontrado")
 
         url = doc.get("url")
         method = doc.get("method", "GET").upper()
-        headers = {h["name"]: h["value"] for h in doc.get("headers", [])}
+
+        raw_headers = doc.get("headers", {})
+
+        # ✅ Compatível com o novo formato (dict) e com legacy (lista)
+        if isinstance(raw_headers, dict):
+            headers = {k: v for k, v in raw_headers.items()}
+        elif isinstance(raw_headers, list):
+            headers = {h["name"]: h["value"] for h in raw_headers if isinstance(h, dict)}
+        else:
+            headers = {}
+
         body = doc.get("body", {})
         response_map = doc.get("response_map", {})
 
         try:
-            # ====== EXECUTA A REQUISIÇÃO ======
             response = requests.request(
                 method=method,
                 url=url,
@@ -137,24 +142,17 @@ class AuthenticatorService:
 
             response.raise_for_status()
 
-            # ====== TENTA LER COMO JSON ======
             try:
                 resp_json = response.json()
             except Exception:
                 resp_json = {"raw": response.text}
 
-            # ====== FUNÇÃO AUXILIAR PARA PEGAR VALOR POR CAMINHO ======
+            # ===== função auxiliar de path =====
             def get_value_by_path(source, path: str):
-                """
-                Caminho do tipo: "data.token" ou "items[0].id"
-                Retorna None se qualquer parte do caminho não existir.
-                """
                 import re
                 value = source
-                parts = re.split(r'\.(?![^\[]*\])', path)  # divide em '.' mas respeita índices com colchetes
-
+                parts = re.split(r'\.(?![^\[]*\])', path)
                 for part in parts:
-                    # Caso tenha índice de lista, exemplo: items[0]
                     match = re.match(r'([^\[]+)\[(\d+)\]', part)
                     if match:
                         key, index = match.groups()
@@ -171,7 +169,6 @@ class AuthenticatorService:
                         return None
                 return value
 
-            # ====== MAPEIA A RESPOSTA ======
             mapped = {}
             if response_map:
                 for key, path in response_map.items():
@@ -181,7 +178,6 @@ class AuthenticatorService:
                     else:
                         mapped[key] = None
 
-            # ====== RETORNO FINAL ======
             return {
                 "success": True,
                 "status": response.status_code,
@@ -199,3 +195,4 @@ class AuthenticatorService:
 
         except Exception as e:
             raise BadRequestError(f"Erro ao executar authenticator: {str(e)}")
+

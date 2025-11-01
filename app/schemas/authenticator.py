@@ -4,19 +4,9 @@ from pydantic import BaseModel, Field, field_validator, RootModel
 
 # ======== MODELOS INTERNOS (EM CAMADAS) ========
 
-class HeaderModel(BaseModel):
-    name: str
-    value: str
-
-
 class AuthenticatorBody(RootModel[Dict[str, Any]]):
     """
     Representa o corpo da requisição do authenticator.
-    Exemplo:
-    {
-        "client_id": "meu_id",
-        "client_secret": "minha_senha"
-    }
     """
     root: Dict[str, Any] = Field(default_factory=dict)
 
@@ -24,11 +14,6 @@ class AuthenticatorBody(RootModel[Dict[str, Any]]):
 class ResponseMapModel(BaseModel):
     """
     Mapeia os campos que devem ser extraídos da resposta da autenticação.
-    Exemplo:
-    {
-        "access_token": "$response.access_token",
-        "expires_in": "$response.expires_in"
-    }
     """
     access_token: Optional[str] = None
     expires_in: Optional[str] = None
@@ -50,7 +35,7 @@ class AuthenticatorBase(BaseModel):
     url: str
     method: str = Field(..., pattern="^(GET|POST|PUT|DELETE|PATCH)$")
     body: Optional[Dict[str, Any]] = Field(default_factory=dict)
-    headers: List[HeaderModel] = Field(default_factory=list)
+    headers: Dict[str, Any] = Field(default_factory=dict)
     response_map: Optional[ResponseMapModel] = None
     enabled: bool = Field(default=True)
 
@@ -65,11 +50,11 @@ class AuthenticatorBase(BaseModel):
 
     @field_validator("headers", mode="before")
     @classmethod
-    def ensure_list(cls, v):
-        if v is None:
-            return []
-        if not isinstance(v, list):
-            raise ValueError("headers deve ser uma lista")
+    def ensure_dict(cls, v):
+        if v in (None, []):
+            return {}
+        if not isinstance(v, dict):
+            raise ValueError("headers deve ser um dicionário")
         return v
 
 
@@ -118,29 +103,17 @@ class AuthenticatorOutDetail(AuthenticatorBase):
         import copy
         data = copy.deepcopy(doc)
 
-        # Oculta valores do body
+        # Oculta valores sensíveis do body
         try:
-            if "body" in data and isinstance(data["body"], dict):
-                masked_body = {}
-                for k, v in data["body"].items():
-                    masked_body[k] = "****"
-                data["body"] = masked_body
+            if isinstance(data.get("body"), dict):
+                data["body"] = {k: "****" for k in data["body"].keys()}
         except Exception:
             pass
 
-        # Oculta valores dos headers
+        # Oculta valores sensíveis dos headers
         try:
-            if "headers" in data and isinstance(data["headers"], list):
-                masked_headers = []
-                for h in data["headers"]:
-                    if isinstance(h, dict):
-                        masked_headers.append({
-                            "name": h.get("name"),
-                            "value": "****" if "value" in h else None
-                        })
-                    else:
-                        masked_headers.append(h)
-                data["headers"] = masked_headers
+            if isinstance(data.get("headers"), dict):
+                data["headers"] = {k: "****" for k in data["headers"].keys()}
         except Exception:
             pass
 
@@ -150,7 +123,7 @@ class AuthenticatorOutDetail(AuthenticatorBase):
             url=data.get("url"),
             method=data.get("method"),
             body=data.get("body", {}),
-            headers=data.get("headers", []),
+            headers=data.get("headers", {}),
             response_map=data.get("response_map"),
             enabled=data.get("enabled", True),
         )
