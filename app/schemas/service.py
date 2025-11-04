@@ -5,8 +5,8 @@ from pydantic import BaseModel, Field, ValidationInfo, field_validator
 # ======== NOVO SCHEMA DE INPUT (LISTA) ========
 
 class Authenticator(BaseModel):
-    id: str = Field(...)
-    name: str = Field(...)
+    id: Optional[str] = None
+    name: Optional[str] = None
 
 class InputFieldModel(BaseModel):
     name: str = Field(..., description="Nome do campo")

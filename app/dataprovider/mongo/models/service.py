@@ -43,17 +43,14 @@ def get_service_detail(id: str):
             }
         },
 
-        # 🔹 Se encontrar, usa. Senão, mantém id e nome nulo
+        # 🔹 Se encontrar autenticador, usa. Senão, retorna null
         {
             "$addFields": {
                 "authenticator": {
                     "$cond": [
                         { "$gt": [ { "$size": "$authenticator_info" }, 0 ] },
                         { "$arrayElemAt": ["$authenticator_info", 0] },
-                        {
-                            "id": "$authenticator.id",
-                            "name": None
-                        }
+                        None
                     ]
                 }
             }

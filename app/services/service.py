@@ -159,8 +159,10 @@ class ServiceService:
                         headers[h["name"]] = h["value"]
 
             body = {}
-
-            authenticator_id = doc.get("authenticator", {}).get("id")
+            
+            authenticator = doc.get("authenticator")
+            authenticator_id = None if authenticator is None else authenticator.get("id")
+            
             if authenticator_id:
                 auth_doc = auth_coll.find_one({"_id": ObjectId(authenticator_id)})
                 if not auth_doc:
@@ -177,7 +179,9 @@ class ServiceService:
                 body,
                 inputs or {}
             )
-
+            print(url)
+            print(headers)
+            print(body)
             response = requests.request(method, url, headers=headers, json=body if body else None)
             response.raise_for_status()
 
