@@ -1,39 +1,30 @@
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, ValidationInfo, field_validator
 
 
-# ======== MODELOS INTERNOS ========
+# ======== NOVO SCHEMA DE INPUT (LISTA) ========
 
-class HeaderModel(BaseModel):
-    name: str = Field(..., description="Nome do cabeçalho HTTP")
-    value: str = Field(..., description="Valor do cabeçalho HTTP")
+class Authenticator(BaseModel):
+    id: str = Field(...)
+    name: str = Field(...)
 
+class InputFieldModel(BaseModel):
+    name: str = Field(..., description="Nome do campo")
+    location: str = Field(..., pattern="^(PATH|QUERY|BODY)$", description="Onde o campo será inserido (PATH, QUERY, BODY)")
+    type: str = Field(..., description="Tipo do campo (string, number, object, etc.)")
+    required: bool = Field(default=False, description="Se o campo é obrigatório")
+    input_mode: str = Field(..., pattern="^(external|fixed)$", description="Origem do valor (external = enviado pelo usuário, fixed = valor interno)")
 
-class SchemaProperty(BaseModel):
-    type: str = Field(..., description="Tipo do campo (ex: string, number, object, etc.)")
-    pattern: Optional[str] = Field(None, description="Expressão regular de validação, se aplicável")
+    # campos opcionais
+    description: Optional[str] = None
+    default: Optional[Any] = Field(None, description="Valor default")
+    path: Optional[str] = Field(None, description="Caminho JSON quando enviado no BODY (ex: $.user.id)")
 
-
-class InputSubSchema(BaseModel):
-    """Representa uma seção do schema (path, query ou body)"""
-    type: str = Field(..., description="Deve ser sempre 'object'")
-    properties: Dict[str, SchemaProperty] = Field(default_factory=dict)
-    required: Optional[List[str]] = Field(default_factory=list)
-
-
-class InputSchemaModel(BaseModel):
-    """Schema completo de entrada conforme o padrão JSON Schema"""
-    type: str = Field(..., description="Deve ser sempre 'object'")
-    properties: Dict[str, InputSubSchema] = Field(
-        ..., description="Contém os blocos path, query e body"
-    )
-    required: Optional[List[str]] = Field(default_factory=list)
-
-    @field_validator("properties", mode="before")
-    @classmethod
-    def ensure_properties_dict(cls, v):
-        if not isinstance(v, dict):
-            raise ValueError("properties deve ser um objeto (dict)")
+    @field_validator("path")
+    def validate_path(cls, v, info: ValidationInfo):
+        location = info.data.get("location")
+        if location == "BODY" and v is not None:
+            raise ValueError("Path deve ser nulo quando location é BODY")
         return v
 
 
@@ -43,31 +34,38 @@ class ServiceBase(BaseModel):
     name: str = Field(..., max_length=150, description="Nome do serviço")
     description: Optional[str] = Field(None, description="Descrição do serviço")
     url: str = Field(..., description="URL do endpoint externo")
-    method: str = Field(..., pattern="^(GET|POST|PUT|DELETE|PATCH)$", description="Método HTTP (GET, POST, etc.)")
-    headers: List[HeaderModel] = Field(default_factory=list, description="Cabeçalhos HTTP")
-    authenticator_id: Optional[str] = Field(None, description="ID do autenticador associado")
-    input_schema: Optional[InputSchemaModel] = Field(
+    method: str = Field(..., pattern="^(GET|POST|PUT|DELETE|PATCH)$", description="Método HTTP")
+    enabled: bool = Field(default=True)
+    headers: Dict[str, Any] = Field(default_factory=dict)
+
+    # NOVO SCHEMA
+    input_schema: Optional[List[InputFieldModel]] = Field(
         None,
-        description="Schema de entrada detalhado (path/query/body) ou null",
+        description="Lista de campos de entrada do serviço (PATH, QUERY, BODY)"
     )
 
     @field_validator("headers", mode="before")
     @classmethod
-    def ensure_list(cls, v):
-        if v is None:
-            return []
-        if not isinstance(v, list):
-            raise ValueError("headers deve ser uma lista")
+    def ensure_dict(cls, v):
+        if v in (None, []):
+            return {}
+        if not isinstance(v, dict):
+            raise ValueError("headers deve ser um dicionário")
         return v
 
 
 # ======== CREATE / UPDATE ========
 
+class AuthenticatorCreateOrUpdate(BaseModel):
+    id: str = Field(..., description="ID do autenticador associado")
+
 class ServiceCreate(ServiceBase):
+    authenticator: Optional[AuthenticatorCreateOrUpdate] = Field(None)
     pass
 
 
 class ServiceUpdate(ServiceBase):
+    authenticator: Optional[AuthenticatorCreateOrUpdate] = Field(None)
     pass
 
 
@@ -79,6 +77,7 @@ class ServiceOutList(BaseModel):
     description: Optional[str] = None
     url: str
     method: str
+    enabled: bool = True
 
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["ServiceOutList"]:
@@ -90,6 +89,7 @@ class ServiceOutList(BaseModel):
             description=doc.get("description"),
             url=doc.get("url"),
             method=doc.get("method"),
+            enabled=doc.get("enabled", True),
         )
 
 
@@ -97,6 +97,7 @@ class ServiceOutList(BaseModel):
 
 class ServiceOutDetail(ServiceBase):
     id: str
+    authenticator: Optional[Authenticator]
 
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["ServiceOutDetail"]:
@@ -106,19 +107,10 @@ class ServiceOutDetail(ServiceBase):
         import copy
         data = copy.deepcopy(doc)
 
-        # 🔹 Oculta valores dos headers
+        # Oculta valores sensíveis dos headers
         try:
-            if "headers" in data and isinstance(data["headers"], list):
-                masked_headers = []
-                for h in data["headers"]:
-                    if isinstance(h, dict):
-                        masked_headers.append({
-                            "name": h.get("name"),
-                            "value": "****" if "value" in h else None
-                        })
-                    else:
-                        masked_headers.append(h)
-                data["headers"] = masked_headers
+            if isinstance(data.get("headers"), dict):
+                data["headers"] = {k: "****" for k in data.get("headers", {}).keys()}
         except Exception:
             pass
 
@@ -128,7 +120,8 @@ class ServiceOutDetail(ServiceBase):
             description=data.get("description"),
             url=data.get("url"),
             method=data.get("method"),
-            headers=data.get("headers", []),
-            authenticator_id=data.get("authenticator_id"),
+            enabled=data.get("enabled", True),
+            headers=data.get("headers", {}),
+            authenticator=data.get("authenticator"),
             input_schema=data.get("input_schema"),
         )

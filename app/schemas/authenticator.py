@@ -1,32 +1,5 @@
 from typing import Any, Dict, List, Optional
-from pydantic import BaseModel, Field, field_validator, RootModel
-
-
-# ======== MODELOS INTERNOS (EM CAMADAS) ========
-
-class AuthenticatorBody(RootModel[Dict[str, Any]]):
-    """
-    Representa o corpo da requisição do authenticator.
-    """
-    root: Dict[str, Any] = Field(default_factory=dict)
-
-
-class ResponseMapModel(BaseModel):
-    """
-    Mapeia os campos que devem ser extraídos da resposta da autenticação.
-    """
-    access_token: Optional[str] = None
-    expires_in: Optional[str] = None
-
-    @field_validator("*", mode="before")
-    @classmethod
-    def ensure_str(cls, v):
-        if v is None:
-            return None
-        if not isinstance(v, str):
-            raise ValueError("Os valores do response_map devem ser strings")
-        return v
-
+from pydantic import BaseModel, Field, field_validator
 
 # ======== MODELOS BASE ========
 
@@ -36,7 +9,7 @@ class AuthenticatorBase(BaseModel):
     method: str = Field(..., pattern="^(GET|POST|PUT|DELETE|PATCH)$")
     body: Optional[Dict[str, Any]] = Field(default_factory=dict)
     headers: Dict[str, Any] = Field(default_factory=dict)
-    response_map: Optional[ResponseMapModel] = None
+    response_map: Dict[str, Any] = Field(default_factory=dict)
     enabled: bool = Field(default=True)
 
     @field_validator("body", mode="before")
@@ -55,6 +28,15 @@ class AuthenticatorBase(BaseModel):
             return {}
         if not isinstance(v, dict):
             raise ValueError("headers deve ser um dicionário")
+        return v
+
+    @field_validator("response_map", mode="before")
+    @classmethod
+    def ensure_dict(cls, v):
+        if v in (None, []):
+            return {}
+        if not isinstance(v, dict):
+            raise ValueError("reponse map deve ser um dicionário")
         return v
 
 
@@ -124,6 +106,6 @@ class AuthenticatorOutDetail(AuthenticatorBase):
             method=data.get("method"),
             body=data.get("body", {}),
             headers=data.get("headers", {}),
-            response_map=data.get("response_map"),
+            response_map=data.get("response_map", {}),
             enabled=data.get("enabled", True),
         )

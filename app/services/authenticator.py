@@ -1,5 +1,6 @@
 from uuid import UUID
 import math
+import json
 from pymongo.errors import DuplicateKeyError
 import requests
 from app.dataprovider.mongo.models.authenticator import collection as auth_coll
@@ -69,11 +70,24 @@ class AuthenticatorService:
 
     @staticmethod
     def update(id: str, payload: AuthenticatorUpdate) -> AuthenticatorOutDetail:
-        """
-        Atualiza um authenticator existente.
-        """
         oid = ensure_object_id(id)
         data = payload.model_dump()
+
+        # Campos onde queremos aplicar a regra de mascarados
+        sensitive_fields = ["body", "headers"]
+
+        for field in sensitive_fields:
+            value = data.get(field)
+
+            if value is not None:
+                value_str = json.dumps(value)
+
+                # Se contém **** descarta -> NÃO salva esse campo
+                if "****" in value_str:
+                    data.pop(field, None)
+                else:
+                    # Mantém o dict, NÃO transforma em string
+                    data[field] = value
 
         try:
             updated = auth_coll.find_one_and_update(
@@ -178,11 +192,7 @@ class AuthenticatorService:
                     else:
                         mapped[key] = None
 
-            return {
-                "success": True,
-                "status": response.status_code,
-                "response": mapped if any(mapped.values()) else resp_json,
-            }
+            return mapped if any(mapped.values()) else resp_json
 
         except requests.exceptions.Timeout:
             raise BadRequestError("Timeout ao executar o authenticator")

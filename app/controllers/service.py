@@ -95,7 +95,6 @@ def delete(id: str):
 
 @router.post(
     "/{id}/execute",
-    response_model=HttpResponse[dict],
     dependencies=[Depends(require_permissions(["*", "srv_execute"]))],
 )
 def execute(
@@ -103,72 +102,6 @@ def execute(
     inputs: Optional[dict] = Body(None, description="Dados conforme input_schema do service")
 ):
     try:
-        result = ServiceService.execute(id, inputs)
-        return ok(data=result)
+        return ServiceService.execute(id, inputs)
     except Exception as e:
         return error(message=f"Erro ao executar service: {str(e)}")
-
-"""
-Exemplo JSON cadastro service
-
-{
-  "_id": "6710bfa9df002b9aafaa1234",
-  "name": "consulta_veiculo",
-  "description": "Consulta veículo por placa e envia dados para análise",
-  "url": "https://api.onidia.com/v1/consultas/{placa}/resultado",
-  "method": "POST",
-  "headers": [
-    { "name": "Content-Type", "value": "application/json" }
-  ],
-  "authenticator_id": "68fe21e6c0df1a9ffc6634ee",
-  "input_schema": {
-    "type": "object",
-    "properties": {
-      "path": {
-        "type": "object",
-        "properties": {
-          "placa": { "type": "string" }
-        },
-        "required": ["placa"]
-      },
-      "body": {
-        "type": "object",
-        "properties": {
-          "cpf": { "type": "string" },
-          "cnpj": { "type": "string" }
-        }
-      },
-      "query": {
-        "type": "object",
-        "properties": {
-          "tipo": { "type": "string" },
-          "origem": { "type": "string" }
-        }
-      }
-    },
-    "required": ["path", "body", "query"]
-  }
-}
-
-Exemplo JSON execute service
-
-POST /services/6710bfa9df002b9aafaa1234/execute
-Content-Type: application/json
-Authorization: Bearer <jwt>
-
-Body:
-
-{
-  "path": {
-    "placa": "ABC1D23"
-  },
-  "body": {
-    "cpf": "12345678900",
-    "cnpj": "27865757000102"
-  },
-  "query": {
-    "tipo": "completo",
-    "origem": "crm"
-  }
-}
-"""

@@ -2,10 +2,13 @@ from uuid import UUID
 import math
 import re
 import requests
+import json
+from copy import deepcopy
 from pymongo.errors import DuplicateKeyError
 from typing import Any, Dict
 from bson import ObjectId
 from app.dataprovider.mongo.models.service import collection as service_coll
+from app.dataprovider.mongo.models.service import get_service_detail
 from app.dataprovider.mongo.models.authenticator import collection as auth_coll
 from app.schemas.service import (
     ServiceCreate,
@@ -50,9 +53,7 @@ class ServiceService:
         """
         Busca um serviço pelo ID.
         """
-        oid = ensure_object_id(id)
-        doc = service_coll.find_one({"_id": oid})
-
+        doc = get_service_detail(id)
         if not doc:
             raise NotFoundError("Serviço não encontrado")
 
@@ -69,7 +70,7 @@ class ServiceService:
             data["contractor_id"] = str(contractor_id)
 
             result = service_coll.insert_one(data)
-            created = service_coll.find_one({"_id": result.inserted_id})
+            created = get_service_detail(result.inserted_id)
             return ServiceOutDetail.from_raw(created)
 
         except DuplicateKeyError:
@@ -84,6 +85,22 @@ class ServiceService:
         oid = ensure_object_id(id)
         data = payload.model_dump()
 
+        # Campos onde queremos aplicar a regra de mascarados
+        sensitive_fields = ["headers"]
+
+        for field in sensitive_fields:
+            value = data.get(field)
+
+            if value is not None:
+                value_str = json.dumps(value)
+
+                # Se contém **** descarta -> NÃO salva esse campo
+                if "****" in value_str:
+                    data.pop(field, None)
+                else:
+                    # Mantém o dict, NÃO transforma em string
+                    data[field] = value
+
         try:
             updated = service_coll.find_one_and_update(
                 {"_id": oid},
@@ -96,6 +113,7 @@ class ServiceService:
         if not updated:
             raise NotFoundError("Serviço não encontrado")
 
+        updated = get_service_detail(oid)
         return ServiceOutDetail.from_raw(updated)
 
     # ========= DELETE =========
@@ -119,89 +137,149 @@ class ServiceService:
 
     @staticmethod
     def execute(id: str, inputs: dict | None = None) -> dict:
-        """
-        Executa um Service configurado.
-        - Busca o service no banco
-        - Executa o Authenticator (se existir)
-        - Lê o response_map do Authenticator e aplica nos headers
-        - Interpreta o input_schema (path, body, query)
-        - Executa a requisição final e retorna o resultado
-        """
         try:
-            # 1️⃣ Busca o documento do service
             doc = service_coll.find_one({"_id": ObjectId(id)})
             if not doc:
                 raise NotFoundError(f"Service com id={id} não encontrado")
 
             url = doc.get("url")
             method = doc.get("method", "GET").upper()
-            headers = {h["name"]: h["value"] for h in doc.get("headers", [])}
-            body = doc.get("body", {}) or {}
-            authenticator_id = doc.get("authenticator_id")
+            raw_headers = doc.get("headers", {})
+            headers = {}
 
-            # 2️⃣ Executa Authenticator se existir
+            if isinstance(raw_headers, dict):
+                if "name" in raw_headers and "value" in raw_headers:
+                    headers[raw_headers["name"]] = raw_headers["value"]
+                else:
+                    headers = raw_headers
+
+            elif isinstance(raw_headers, list):
+                for h in raw_headers:
+                    if isinstance(h, dict) and "name" in h and "value" in h:
+                        headers[h["name"]] = h["value"]
+
+            body = {}
+
+            authenticator_id = doc.get("authenticator", {}).get("id")
             if authenticator_id:
                 auth_doc = auth_coll.find_one({"_id": ObjectId(authenticator_id)})
                 if not auth_doc:
                     raise NotFoundError(f"Authenticator com id={authenticator_id} não encontrado")
 
                 response_map = auth_doc.get("response_map", {}) or {}
-                try:
-                    auth_response = AuthenticatorService.execute(authenticator_id)
-                    ServiceService._inject_response_map_into_headers(
-                        headers, response_map, auth_response
-                    )
-                except Exception as e:
-                    raise BadRequestError(f"Falha ao executar authenticator: {str(e)}")
+                auth_response = AuthenticatorService.execute(authenticator_id)
+                ServiceService._inject_response_map_into_headers(headers, response_map, auth_response)
 
-            # 3️⃣ Monta a requisição conforme input_schema
-            if inputs:
-                url, body = ServiceService._apply_input_schema(
-                    doc.get("input_schema"), url, body, inputs
-                )
+            # NProcessamento do input_schema
+            url, body = ServiceService._apply_input_schema(
+                doc.get("input_schema") or [],
+                url,
+                body,
+                inputs or {}
+            )
 
-            # 4️⃣ Executa requisição principal
+            response = requests.request(method, url, headers=headers, json=body if body else None)
+            response.raise_for_status()
+
             try:
-                response = requests.request(method, url, headers=headers, json=body if body else None)
-                response.raise_for_status()
-                try:
-                    return response.json()
-                except ValueError:
-                    return {"status": "success", "text": response.text}
-
-            except requests.HTTPError as e:
-                return {
-                    "status": "error",
-                    "message": f"Erro HTTP {e.response.status_code}: {e.response.reason}",
-                    "url": url,
-                    "method": method,
-                }
-            except requests.ConnectionError:
-                return {"status": "error", "message": f"Falha de conexão ao acessar {url}"}
-            except requests.Timeout:
-                return {"status": "error", "message": f"Timeout ao acessar {url}"}
-            except Exception as e:
-                return {"status": "error", "message": f"Erro inesperado: {str(e)}"}
+                return response.json()
+            except ValueError:
+                return {"status": "success", "response": response.text}
 
         except NotFoundError as e:
             return {"status": "error", "message": str(e)}
+
         except BadRequestError as e:
             return {"status": "error", "message": str(e)}
-        except Exception as e:
-            return {"status": "error", "message": f"Erro crítico na execução: {str(e)}"}
 
-    # ======================================================================
+        except requests.HTTPError as e:
+            return {
+                "status": "error",
+                "message": f"Erro HTTP {e.response.status_code}: {e.response.reason}",
+                "url": url,
+                "method": method,
+            }
+
+        except Exception as e:
+            return {"status": "error", "message": f"Erro inesperado: {str(e)}"}
+
+    # ===================================================================================
+    @staticmethod
+    def _apply_input_schema(input_schema: list, url: str, body: dict, inputs: dict):
+        """
+        Novo engine de input_schema suportando:
+        - location: PATH | QUERY | BODY
+        - input_mode: fixed | external
+        - defaults
+        - body completo ($)
+        - paths JSON: $.a.b.c
+        """
+
+        final_body = deepcopy(body)
+        query_params = {}
+
+        for field in input_schema:
+            name = field.get("name")
+            location = field.get("location")
+            input_mode = field.get("input_mode", "external")
+            required = field.get("required", False)
+            default = field.get("default")
+            json_path = field.get("path")
+
+            user_value = inputs.get(name)
+
+            # Lógica do input_mode
+            if input_mode == "fixed":
+                value = default
+            else:
+                if user_value is not None:
+                    value = user_value
+                elif required and default is None:
+                    raise BadRequestError(f"Campo '{name}' é obrigatório")
+                else:
+                    value = default
+
+            # -------- PATH --------
+            if location == "PATH":
+                if value is None:
+                    raise BadRequestError(f"Valor para '{name}' obrigatório para PATH")
+
+                url = re.sub(fr":{name}\b", str(value), url)
+                url = re.sub(fr"\{{{name}\}}", str(value), url)
+
+            # -------- QUERY --------
+            elif location == "QUERY":
+                if value is not None:
+                    query_params[name] = value
+
+            # -------- BODY --------
+            elif location == "BODY":
+                if json_path == "$":  # body inteiro
+                    if not isinstance(value, dict):
+                        raise BadRequestError(f"O campo '{name}' com path '$' deve ser um objeto")
+                    final_body = value
+                else:
+                    if value is not None:
+                        keys = json_path.replace("$.", "").split(".")
+                        ref = final_body
+                        for k in keys[:-1]:
+                            if k not in ref or not isinstance(ref[k], dict):
+                                ref[k] = {}
+                            ref = ref[k]
+                        ref[keys[-1]] = value
+
+        # aplica querystring
+        if query_params:
+            qs = "&".join(f"{k}={v}" for k, v in query_params.items())
+            url += ("&" if "?" in url else "?") + qs
+
+        return url, final_body
+
+    # ===================================================================================
     @staticmethod
     def _inject_response_map_into_headers(headers: dict, response_map: dict, auth_response: dict):
-        """
-        Interpreta o response_map do Authenticator e injeta valores nos headers.
-        Exemplo:
-            response_map = { "Authorization": "Bearer $.token" }
-        """
-        
         for header_name, expr in response_map.items():
             final_value = expr
-            # Localiza tokens do tipo $.campo
             matches = re.findall(r'\$\.[\w.]+', expr)
             for match in matches:
                 value = ServiceService._resolve_jsonpath(auth_response, match)
@@ -209,56 +287,26 @@ class ServiceService:
                     final_value = final_value.replace(match, str(value))
             headers[header_name] = final_value
 
-    # ======================================================================
+    # ===================================================================================
     @staticmethod
-    def _resolve_jsonpath(data: dict, path: str) -> Any:
-        """Resolve $.campo ou $.a.b.c dentro do JSON."""
+    def _resolve_jsonpath(data: dict, path: str):
+        matches = re.findall(r'\$\.[\w.]+', path)
+        final_value = path
 
-        path = path.replace("$.", "$.response.") #Ajuste para o retorno de authenticator
-        keys = path.strip("$.").split(".")
-        value = data
-        for key in keys:
-            if isinstance(value, dict):
-                value = value.get(key)
-            else:
-                return None
+        for m in matches:
+            keys = m.replace("$.", "").split(".")
+            value = data
+            for k in keys:
+                if isinstance(value, dict):
+                    value = value.get(k)
+                else:
+                    value = None
+                    break
 
-        return value
+            if value is not None:
+                final_value = final_value.replace(m, str(value))
 
-    # ======================================================================
-    @staticmethod
-    def _apply_input_schema(input_schema: dict, url: str, body: dict, inputs: dict):
-        """
-        Interpreta input_schema (padrão MCP/FastMCP) para preencher URL e body.
-        Suporta parâmetros de path nos formatos:
-        - :param
-        - {param}
+        if final_value == path and matches and len(matches) == 1 and path.strip() == matches[0]:
+            return value
 
-        Exemplo:
-            schema: { path: { cnpj: {...} } }
-            url: /api/cnpj/:cnpj ou /api/cnpj/{cnpj}
-            inputs: { path: { "cnpj": "12345678000199" } }
-        """
-        if not input_schema or not inputs:
-            return url, body
-
-        # 🔹 Path parameters
-        path_vars = inputs.get("path", {})
-        for k, v in path_vars.items():
-            # Substitui :param e {param}
-            url = re.sub(fr":{k}\b", str(v), url)
-            url = re.sub(fr"\{{{k}\}}", str(v), url)
-
-        # 🔹 Body parameters
-        body_vars = inputs.get("body", {})
-        if body_vars:
-            body = body_vars
-
-        # 🔹 Query parameters
-        query_vars = inputs.get("query", {})
-        if query_vars:
-            query_string = "&".join([f"{k}={v}" for k, v in query_vars.items()])
-            sep = "&" if "?" in url else "?"
-            url = f"{url}{sep}{query_string}"
-
-        return url, body
+        return final_value

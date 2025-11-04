@@ -95,7 +95,6 @@ def delete(id: str):
 
 @router.post(
     "/{id}/execute",
-    response_model=HttpResponse[dict],
     dependencies=[Depends(require_permissions(["*", "hcdg7execau"]))],
 )
 def execute(id: str):
@@ -106,5 +105,4 @@ def execute(id: str):
     - Monta e executa a chamada HTTP (url, método, headers, body).
     - Retorna a resposta já processada conforme o response_map configurado.
     """
-    result = AuthenticatorService.execute(id)
-    return ok(data=result, message="Serviço executado com sucesso!")
+    return AuthenticatorService.execute(id)
