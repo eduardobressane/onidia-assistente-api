@@ -47,26 +47,19 @@ class OCPMDynamicService:
 
         tools_metadata = []
         for t in ocpm.get("tools", []):
-            service_id = t["service"]["id"]
-            service_doc = service_coll.find_one({"_id": ObjectId(service_id)}, {"input_schema": 1, "method": 1, "url": 1})
-
-            if not service_doc:
-                continue
+            input_schema_obj = OCPMDynamicService._get_tool_schema(t)
 
             tools_metadata.append({
                 "name": t["name"],
                 "description": t.get("description"),
-                "method": service_doc.get("method", "GET"),
-                "service_url": service_doc.get("url"),
-                "execute_url": f"/ocp-m/{id}/tools/{t['name']}/execute",
-                "input_schema": service_doc.get("input_schema"),
+                "input_schema": input_schema_obj,
             })
 
         return {
-            "ocp_m_id": str(ocpm["_id"]),
+            "id": str(ocpm["_id"]),
             "name": ocpm.get("name"),
             "description": ocpm.get("description"),
-            "base_url": f"/ocp-m/{id}",
+            "tools_url": f"/ocp-m/{id}/tools",
             "tools": tools_metadata,
             "metadata": {
                 "generated_at": datetime.now().isoformat(),
@@ -90,7 +83,7 @@ class OCPMDynamicService:
                 {
                     "name": t["name"],
                     "description": t.get("description"),
-                    "args": OCPMDynamicService._get_tool_schema(t["service"]["id"])
+                    "input_chema": OCPMDynamicService._get_tool_schema(t)
                 }
                 for t in ocpm.get("tools", [])
             ]
@@ -113,7 +106,47 @@ class OCPMDynamicService:
 
     # ==========================================================
     @staticmethod
-    def _get_tool_schema(service_id: str) -> dict:
-        """Obtém o input_schema do service"""
-        doc = service_coll.find_one({"_id": ObjectId(service_id)})
-        return doc.get("input_schema", {}) if doc else {}
+    def _get_tool_schema(t) -> dict:
+        """Obtém o input_schema da tool"""
+        service_id = t["service"]["id"]
+        service_doc = service_coll.find_one(
+            {"_id": ObjectId(service_id)},
+            {"input_schema": 1, "method": 1, "url": 1}
+        )
+
+        input_schema_array = service_doc.get("input_schema", [])
+        external_fields = [f for f in input_schema_array if f.get("input_mode") == "external"]
+
+        # Monta schema no formato MCP
+        if external_fields:
+            properties = {}
+            required = []
+
+            for field in external_fields:
+                field_name = field.get("name")
+                if not field_name:
+                    continue
+
+                properties[field_name] = {
+                    "type": field.get("type", "string"),
+                    "description": field.get("description") or ""
+                }
+
+                if field.get("required", False):
+                    required.append(field_name)
+
+            input_schema_obj = {
+                "type": "object",
+                "properties": properties,
+                "required": required,
+                "additionalProperties": t["additional_properties"]
+            }
+        else:
+            input_schema_obj = {
+                "type": "object",
+                "properties": {},
+                "required": [],
+                "additionalProperties": False
+            }
+
+        return input_schema_obj

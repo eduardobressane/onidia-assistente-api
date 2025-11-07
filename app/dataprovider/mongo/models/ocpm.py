@@ -3,6 +3,7 @@ from pymongo import ASCENDING
 from bson import ObjectId
 from app.core.utils.mongo import ensure_object_id
 from uuid import UUID
+from typing import List
 
 COLLECTION_NAME = "ocp-m"
 collection = db[COLLECTION_NAME]
@@ -119,31 +120,49 @@ def get_ocpm_detail(id: str):
     docs = list(cursor)
     return docs[0] if docs else None
 
-def validate_service(db, contractor_id: UUID | None, service_id: str): 
+def validate_services(db, contractor_id: UUID | None, tools):
     """
-    Valida se o service informado:
-      - Existem na base
-      - Pertencem ao mesmo contractor_id (se informado)
+    Valida todos os serviços referenciados em tools.
+
+    Cada item em `tools` deve ter a estrutura:
+      {
+        "service": {
+          "id": "<id do serviço>"
+        }
+      }
+
+    Regras de validação:
+      - O serviço deve existir na base
+      - Se contractor_id for informado, deve pertencer ao mesmo contractor
     """
     service_collection = db["service"]
 
-    oid = ensure_object_id(service_id)
+    for tool in tools:
+        # Compatível com Pydantic e dict
+        if hasattr(tool, "service"):
+            service_obj = tool.service
+            service_id = getattr(service_obj, "id", None)
+        else:
+            service_id = tool.get("service", {}).get("id")
 
-    # Verifica existência e relação com contractor_id
-    query = {"_id": oid}
-    if contractor_id is not None:
-        query["contractor_id"] = str(contractor_id)
+        if not service_id:
+            raise BusinessDomainError("Tool inválida: 'service.id' ausente.")
 
-    service_data = service_collection.find_one(
-        query,
-        {"_id": 1, "_id": 1, "contractor_id": 1}
-    )
+        oid = ensure_object_id(service_id)
 
-    if not service_data:
-        # Segunda verificação: existe, mas pertence a outro contractor?
-        exists_any = service_collection.find_one({"_id": oid}, {"contractor_id": 1})
-        if exists_any:
-            raise BusinessDomainError(
-                f"Serviço com id {service_id} não existe."
-            )
-        raise NotFoundError(f"Serviço com id {service_id} não existe.")
+        query = {"_id": oid}
+        if contractor_id is not None:
+            query["contractor_id"] = str(contractor_id)
+
+        service_data = service_collection.find_one(
+            query,
+            {"_id": 1, "contractor_id": 1}
+        )
+
+        if not service_data:
+            exists_any = service_collection.find_one({"_id": oid}, {"contractor_id": 1})
+            if exists_any:
+                raise BusinessDomainError(
+                    f"Serviço com id {service_id} pertence a outro contratante."
+                )
+            raise NotFoundError(f"Serviço com id {service_id} não existe.")

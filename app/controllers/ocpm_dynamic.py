@@ -6,12 +6,12 @@ from app.core.security import require_permissions, get_current_user, validate_an
 from uuid import UUID
 from typing import Optional
 
-router = APIRouter(prefix="/ocp-m/dynamic", tags=["OCP-M Dynamic"])
+router = APIRouter(prefix="/ocp-m/dynamic", tags=["OCP-M"])
 
 
 @router.get(
     "/registry",
-    response_model=HttpResponse[list],
+    response_model=list,
     dependencies=[Depends(require_permissions(["*", "hcopm_registry"]))],
 )
 def registry(
@@ -22,38 +22,38 @@ def registry(
     contractor_id = validate_and_alter_contractor(current_user, contractor_id)
     
     try:
-        return ok(data=OCPMDynamicService.registry(contractor_id))
+        return OCPMDynamicService.registry(contractor_id)
     except Exception as e:
         return error(status_code=400, message=f"Erro ao listar OCP-Ms: {str(e)}")
 
 
 @router.get(
     "/{id}/schema.json",
-    response_model=HttpResponse[dict],
+    response_model=dict,
     dependencies=[Depends(require_permissions(["*", "hcopm_view"]))],
 )
 def get_schema(id: str = Path(...)):
     """Retorna metadados OpenAPI-like do OCP-M"""
     try:
-        return ok(data=OCPMDynamicService.schema(id))
+        return OCPMDynamicService.schema(id)
     except Exception as e:
         return error(status_code=400, message=f"Erro ao montar schema OCP-M: {str(e)}")
 
 
 @router.get(
     "/{id}/tools",
-    response_model=HttpResponse[dict]
+    response_model=dict
 )
 def list_tools(id: str = Path(...)):
     """Retorna o formato FastMCP completo"""
     try:
-        return ok(data=OCPMDynamicService.list_tools(id))
+        return OCPMDynamicService.list_tools(id)
     except Exception as e:
         return error(status_code=400, message=f"Erro ao montar OCP-M: {str(e)}")
 
 
 @router.post(
-    "/{id}/tools/{tool_name}/execute",
+    "/{id}/tools/{tool_name}",
     response_model=HttpResponse[dict],
     dependencies=[Depends(require_permissions(["*", "hcopm_execute"]))],
 )

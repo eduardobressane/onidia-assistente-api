@@ -12,6 +12,7 @@ class ServiceModel(BaseModel):
 class ToolModel(BaseModel):
     name: str = Field(..., description="Internal name of the tool")
     description: Optional[str] = Field(None, description="Description of the tool's function")
+    additional_properties: bool = Field(default=False)
     service: ServiceModel = Field(None, description="Associated service")
 
 
@@ -20,6 +21,7 @@ class ToolModel(BaseModel):
 class OCPMBase(BaseModel):
     name: str = Field(..., max_length=150)
     description: Optional[str] = None
+    enabled: bool = Field(default=True)
     tools: List[ToolModel] = Field(default_factory=list)
 
     @field_validator("tools", mode="before")
@@ -39,17 +41,20 @@ class ServiceModelCreateOrUpdate(BaseModel):
 class ToolModelCreateOrUpdate(BaseModel):
     name: str = Field(..., description="Internal name of the tool")
     description: Optional[str] = Field(None, description="Description of the tool's function")
+    additional_properties: bool = Field(default=False)
     service: ServiceModelCreateOrUpdate = Field(None, description="Associated service")
 
 class OCPMCreate(OCPMBase):
     name: str = Field(..., max_length=150)
     description: Optional[str] = None
+    enabled: bool = Field(default=True)
     tools: List[ToolModelCreateOrUpdate] = Field(default_factory=list)
 
 
 class OCPMUpdate(OCPMBase):
     name: str = Field(..., max_length=150)
     description: Optional[str] = None
+    enabled: bool = Field(default=True)
     tools: List[ToolModelCreateOrUpdate] = Field(default_factory=list)
 
 
@@ -59,6 +64,7 @@ class OCPMOutList(BaseModel):
     id: str
     name: str
     description: Optional[str] = None
+    enabled: bool
 
     @classmethod
     def from_raw(cls, doc: dict) -> Optional["OCPMOutList"]:
@@ -68,6 +74,7 @@ class OCPMOutList(BaseModel):
             id=str(doc.get("_id")),
             name=doc.get("name"),
             description=doc.get("description"),
+            enabled=doc.get("enabled"),
         )
 
 
